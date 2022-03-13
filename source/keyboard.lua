@@ -1,7 +1,4 @@
-import "CoreLibs/graphics"
-import "CoreLibs/sprites"
-
-local gfx <const> = playdate.graphics
+import "classes/Key"
 
 local layout <const> = {
     {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"},
@@ -9,15 +6,14 @@ local layout <const> = {
     {"Z", "X", "C", "V", "B", "N", "M"}
 }
 
-local font       = gfx.getSystemFont(gfx.font.kVariantBold)
-local fontHeight = font:getHeight()
-
 local origin <const> = {x = 200, y = 165}
 local size <const>   = {width = 20, height = 25}
 
 local keyboard = {}
 local selected = {row = 1, position = 1}
 
+-- Iterate through the keyboard layout and instantiate a Key object for each. The Key object will
+-- then handle configuring its own sprite.
 function setupKeyboard()
     for rowIndex, row in ipairs(layout) do
         keyboard[rowIndex] = keyboard[rowIndex] or {}
@@ -26,52 +22,24 @@ function setupKeyboard()
         local leftPadding = math.ceil(((10 - #row) * size.width) / 2)
 
         for position, letter in ipairs(row) do
-            local sprite = gfx.sprite.new()
-
-            sprite.char = letter
-
-            -- We are highlighted if our position matches the selected position
-            sprite.highlighted = function ()
-                return rowIndex == selected.row and position == selected.position
-            end
-
-            sprite.draw = function (self, x, y, width, height)
-                -- If we're highlighted, draw a black round-rect background and switch to white text
-                if (self.highlighted()) then
-                    gfx.setColor(gfx.kColorBlack)
-                    gfx.fillRoundRect(0, 0, size.width, size.height, 3)
-
-                    gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
-                end
-
-                -- Draw the appropriate letter in the center of the sprite
-                font:drawTextAligned(self.char,
-                                     math.ceil(self.width / 2),
-                                     math.ceil((self.height - fontHeight) / 2),
-                                     kTextAlignment.center)
-
-                -- Reset back to original drawing mode
-                gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
-            end
-
-            -- Set the sprite bounds to the correct location and size on-screen
-            sprite:setBounds(origin.x + leftPadding + ((position - 1) * size.width),
-                             origin.y + ((rowIndex - 1) * size.height),
-                             size.width,
-                             size.height)
-
-            sprite:add()
-
-            keyboard[rowIndex][position] = sprite
+            -- Offset the origin based on where in the keyboard we are
+            keyboard[rowIndex][position] = Key(
+                letter,
+                {
+                    x = origin.x + leftPadding + ((position - 1) * size.width),
+                    y = origin.y + ((rowIndex - 1) * size.height)
+                },
+                size
+            )
         end
     end
 
-    return keyboard
+    keyboard[selected.row][selected.position]:setHighlighted(true)
 end
 
 function handleInput(button)
-    -- Mark the previously selected letter as needing a redraw
-    keyboard[selected.row][selected.position]:markDirty()
+    -- Unhighlight the previously selected letter
+    keyboard[selected.row][selected.position]:setHighlighted(false)
 
     -- If we're pressing up or down, move between rows, making sure to limit the position selection
     -- to the last position in the new row
@@ -106,6 +74,6 @@ function handleInput(button)
         end
     end
 
-    -- Finally, mark the newly selected letter as needing a redraw
-    keyboard[selected.row][selected.position]:markDirty()
+    -- Finally, highlight the newly selected letter
+    keyboard[selected.row][selected.position]:setHighlighted(true)
 end
