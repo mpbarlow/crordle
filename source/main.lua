@@ -11,27 +11,29 @@ local gfx <const> = playdate.graphics
 local wordList <const> = import "words"
 local word
 
-local directions = {playdate.kButtonUp,
-                    playdate.kButtonDown,
-                    playdate.kButtonLeft,
-                    playdate.kButtonRight}
+local directions = {
+    playdate.kButtonUp,
+    playdate.kButtonDown,
+    playdate.kButtonLeft,
+    playdate.kButtonRight
+}
 
 -- Stuff to model:
 -- [x] Word list
     -- [x] Selecting random word
--- [ ] Keyboard
+-- [x] Keyboard
     -- [x] Draw keyboard
-    -- [ ] Draw highlighting
-    -- [ ] Currently selected key
+    -- [x] Draw highlighting
+    -- [x] Currently selected key
 -- [ ] Board
     -- [ ] Current entry
     -- [ ] Previously entered words
     -- [ ] Position detection/colouring
 
 function setupGame()
-    setupKeyboard()
-
     math.randomseed(playdate.getSecondsSinceEpoch())
+
+    setupKeyboard()
     word = randomWord(wordList)
 end
 

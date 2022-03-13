@@ -1,7 +1,9 @@
-return {"alpha",
-        "altar",
-        "alter",
-        "beast",
-        "beefy",
-        "beget",
-        "words"}
+return {
+    "alpha",
+    "altar",
+    "alter",
+    "beast",
+    "beefy",
+    "beget",
+    "words"
+}
