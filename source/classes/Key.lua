@@ -42,7 +42,6 @@ local function initSprite(key, origin, size)
 end
 
 class('Key', {
-    letter = "",
     highlighted = false,
     setHighlighted = function (self, highlighted)
         self.highlighted = highlighted
