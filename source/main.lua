@@ -15,7 +15,7 @@ local squareSize <const>   = {width = 30, height = 30}
 local squareMargin <const> = 5
 
 local board <const> = {}
-local activeSquare  = {row = 1, square = 1}
+local activeSquare  = {row = 1, position = 1}
 
 local function makeBoard()
     for row = 1, 6 do
@@ -34,7 +34,7 @@ makeBoard()
 
 local activeRing = ActiveRing(boardOrigin, squareSize, squareMargin)
 
-local boardSquare = board[activeSquare.row][activeSquare.square]
+local boardSquare = board[activeSquare.row][activeSquare.position]
 
 function playdate.update()
     local change, acceleratedChange = playdate.getCrankChange()
@@ -49,17 +49,21 @@ function playdate.update()
         boardSquare:moveToNextLetter()
 
     elseif (playdate.buttonJustPressed(playdate.kButtonLeft)) then
-        activeSquare.square -= 1
-        activeRing:moveTo(activeSquare.row, activeSquare.square)
+        if (activeSquare.position > 1) then
+            activeSquare.position -= 1
+            activeRing:moveTo(activeSquare.row, activeSquare.position)
+        end
 
     elseif (playdate.buttonJustPressed(playdate.kButtonRight)) then
-        activeSquare.square += 1
-        activeRing:moveTo(activeSquare.row, activeSquare.square)
+        if (activeSquare.position < 5) then
+            activeSquare.position += 1
+            activeRing:moveTo(activeSquare.row, activeSquare.position)
+        end
     end
 
     for row = 1, activeSquare.row do
         for square = 1, 5 do
-            board[row][square].inPlay = square <= activeSquare.square
+            board[row][square].inPlay = square <= activeSquare.position
             board[row][square]:update()
         end
     end
@@ -69,5 +73,5 @@ function playdate.update()
     playdate.timer.updateTimers()
     playdate.drawFPS(380, 225)
 
-    boardSquare = board[activeSquare.row][activeSquare.square]
+    boardSquare = board[activeSquare.row][activeSquare.position]
 end

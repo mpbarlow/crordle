@@ -79,6 +79,20 @@ class('BoardSquare', {
         return currentIndex + 1
     end,
 
+    -- Why this is a different value to currentIndex is not immediately obvious. currentIndex is
+    -- whichever index/letter the top of the square is currently inside. However, having scrolled
+    -- more than half a square in either direction, we're actually closer to the next/previous
+    -- letter. As such, we want to snap to *that* letter, not back to whatever we were on before.
+    closestIndex = function(self)
+        return math.floor((self.offset / self.size.height) + 0.5) + 1
+    end,
+
+    -- Similarly to above, when the game asks us what letter we've selected, we want whatever
+    -- letter we're going to snap to. This means speedy players won't be tripped up.
+    closestLetter = function(self)
+        return letters[self:closestIndex()]
+    end,
+
     -- Animate to `moveBy` letters away
     moveLetter = function(self, moveBy)
         -- This looks a little weird, but the offset is 0-based while currentIndex is 1-based.
@@ -148,9 +162,7 @@ class('BoardSquare', {
             -- self.offset starts at the top of the square, so the logical snapping point from a
             -- visual perspective should act as if we were scrolled half a square further than we
             -- actually are, so line up with the center line.
-            self:animateTo(
-                (self:indexOfOffset(self.offset + (self.size.height / 2)) - 1) * self.size.height
-            )
+            self:animateTo((self:closestIndex() - 1) * self.size.height)
         end
     end
 }).extends()
