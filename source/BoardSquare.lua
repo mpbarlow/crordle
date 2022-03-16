@@ -10,7 +10,7 @@ local letters <const> = {
     "T", "U", "V", "W", "X", "Y", "Z"
 }
 
-local rotationMultiplier <const> = 0.5
+local lettersPerCrank <const> = 3
 local animationDuration <const> = 250
 local snapTimeout <const> = 1000
 
@@ -20,163 +20,187 @@ local snapTimeout <const> = 1000
 -- The current letter seamlessly becomes the last letter (and the next the current) as scrolling
 -- occurs, by mapping the offset over the 26 letters.
 class('BoardSquare', {
-    -- Stores the scroll offset, from 0 to 26 * size.height.
-    offset = 0,
-
     -- Squares that are not yet in play do not render a letter.
-    inPlay = false,
+    inPlay = false
+}).extends()
 
-    -- Move the offset by `change` to move the scroll window.
-    moveOffset = function(self, change)
-        self:setOffset(self.offset + change)
-    end,
+function BoardSquare:init(origin, size)
+    BoardSquare.super.init(self)
+
+    -- Alias self to allow the sprite draw callback to read data from this.
+    local boardSquare = self
+
+    -- Store the letter index. This is the source of truth for what letter is actually selected in
+    -- the square.
+    local index = 1
+    local maxIndex <const> = #letters
+
+    -- Stores the scroll offset, from 0 to 26 * size.height. Offset is used for drawing, not the
+    -- selection of letters, however during cranking the offset does update the index based on the
+    -- closest letter.
+    local offset = 0
+    local maxOffset <const> = size.height * #letters;
+
+    local sprite = gfx.sprite.new()
+
+    -- Handles animating to a new position when using the buttons.
+    local animator = nil
+
+    -- Tracks how long it has been since cranking stopped. After the timer ends, the display will
+    -- "snap" to the nearest letter.
+    local snapTimer = nil
+
+    -- Create a new animator from the current offset to the given value.
+    local function animateOffsetTo(to)
+        -- To correctly handle wrapping at either end, we want to always animate via the shortest
+        -- path to the target offset.
+        -- e.g. if we are at offset 0 (A) and want to move to offset 750 (Z), we actually want to go
+        -- back one letter instead of forward by 25.
+        -- To do this we work out the offset to get to the same place in the opposite direction,
+        -- and always take whichever path is shortest.
+        local oppositeEquivalent
+
+        if (to > offset) then
+            oppositeEquivalent = to - maxOffset
+        else
+            oppositeEquivalent = maxOffset + to
+        end
+
+        if (math.abs(oppositeEquivalent - offset) < math.abs(to - offset)) then
+            to = oppositeEquivalent
+        end
+
+        animator = gfx.animator.new(animationDuration, offset, to)
+    end
 
     -- Set the offset to an explicit value, wrapping at either end. The wrapping functionality
     -- allows us to not have to worry about whether any animators we use cross a wrap boundary
-    -- (e.g. we can animate from 0 to -30 and this method will just handle it).
-    setOffset = function(self, offset)
-        local maxOffset = self.size.height * 26;
-
-        if (offset < 0) then
-            offset = offset + maxOffset
-        elseif (offset >= maxOffset) then
-            offset = offset - maxOffset
+    -- (e.g. we can animate from 0 to -30 and this function will handle wrapping it for us).
+    -- Because offset determines where the letter is drawn, we also mark the sprite as dirty.
+    local function setOffset(newOffset)
+        if (newOffset < 0) then
+            newOffset += maxOffset
+        elseif (newOffset >= maxOffset) then
+            newOffset -= maxOffset
         end
 
-        self.offset = offset
-        self.sprite:markDirty()
-    end,
+        offset = newOffset
+        sprite:markDirty()
+    end
 
-    -- Return the letter index of a given scroll offset.
-    indexOfOffset = function(self, offset)
-        return math.floor(offset / self.size.height) + 1
-    end,
+    -- Similar to setOffset, but allow us to set the current letter index instead.
+    local function setIndex(newIndex)
+        if (newIndex < 1) then
+            newIndex += maxIndex
+        elseif (newIndex > maxIndex) then
+            newIndex -= maxIndex
+        end
 
-    -- Use the current scroll offset to determine how far through the list of letters we are.
-    currentIndex = function(self)
-        return self:indexOfOffset(self.offset)
-    end,
+        index = newIndex
+    end
+
+    -- currentRenderIndex is whichever index/letter the top of the square is currently inside.
+    -- However, having scrolled more than half a square in either direction, we're actually closer
+    -- to the next/previous letter. As such, we want to snap to *that* letter, not back to whatever
+    -- we were on before.
+    local function closestIndexToOffset()
+        return math.floor((offset / size.height) + 0.5) + 1
+    end
+
+    -- Return which letter index the offset is currently pointing at.
+    local function currentRenderIndex()
+        return math.floor(offset / size.height) + 1
+    end
 
     -- Return the index of the previous letter, wrapping back round to the last if needed.
-    previousIndex = function(self)
-        local currentIndex = self:currentIndex()
+    local function previousRenderIndex()
+        local currentIndex = currentRenderIndex()
 
         if (currentIndex - 1 <= 0) then
             return #letters
         end
 
         return currentIndex - 1
-    end,
+    end
 
     -- Return the index of the next letter, wrapping back round to the first if needed.
-    nextIndex = function(self)
-        local currentIndex = self:currentIndex()
+    local function nextRenderIndex()
+        local currentIndex = currentRenderIndex()
 
-        if (currentIndex + 1 > #letters) then
+        if (currentIndex + 1 > maxIndex) then
             return 1
         end
 
         return currentIndex + 1
-    end,
-
-    -- Why this is a different value to currentIndex is not immediately obvious. currentIndex is
-    -- whichever index/letter the top of the square is currently inside. However, having scrolled
-    -- more than half a square in either direction, we're actually closer to the next/previous
-    -- letter. As such, we want to snap to *that* letter, not back to whatever we were on before.
-    closestIndex = function(self)
-        return math.floor((self.offset / self.size.height) + 0.5) + 1
-    end,
-
-    -- Similarly to above, when the game asks us what letter we've selected, we want whatever
-    -- letter we're going to snap to. This means speedy players won't be tripped up.
-    closestLetter = function(self)
-        return letters[self:closestIndex()]
-    end,
-
-    -- Animate to `moveBy` letters away
-    moveLetter = function(self, moveBy)
-        -- This looks a little weird, but the offset is 0-based while currentIndex is 1-based.
-        -- (currentIndex - 1) * height gives us the top offset of the current letter, so we can
-        -- then subtract or add n whole square sizes to get the top point of the prev/next.
-        -- We don't want to use previousIndex because that will wrap, causing an animation from A
-        -- backwards to Z to scroll through 26 letters forwards, instead of 1 backwards.
-        self:animateTo(((self:currentIndex() - 1) * self.size.height) + (moveBy * self.size.height))
-    end,
-
-    -- Animate to the next letter.
-    moveToNextLetter = function(self)
-        self:moveLetter(1)
-    end,
-
-    -- Animate to the previous letter.
-    moveToPreviousLetter = function(self)
-        self:moveLetter(-1)
-    end,
+    end
 
     -- Handle `change` degrees of crank rotation.
-    handleCranking = function(self, change)
+    local function handleCranking(self, change)
         -- If we're currently animating to a new selection from a button press, cancel it so the
         -- crank takes priority.
-        self.animator = nil
+        animator = nil
 
-        if (self.snapTimer == nil) then
+        if (snapTimer == nil) then
             -- This timer will track how long it's been since cranking stopped, so after a brief
             -- pause we can snap the letter into place.
-            self.snapTimer = playdate.timer.new(snapTimeout)
+            snapTimer = playdate.timer.new(snapTimeout)
         end
 
-        -- Reset the timer each time the crank moves so we don't time out while still moving.
-        self.snapTimer:reset()
+        -- Reset the timer each time the crank moves, so we don't time out while still moving.
+        snapTimer:reset()
 
-        self:moveOffset(change * rotationMultiplier)
-    end,
+        -- Update the offset by however much we moved.
+        setOffset(offset + ((change * lettersPerCrank * size.height) / 360))
 
-    -- Create a new animator from the current offset to the given value.
-    animateTo = function(self, to)
-        self.animator = gfx.animator.new(animationDuration, self.offset, to)
-    end,
+        -- Make sure the index immediately reflects our offset position so that speedy players don't
+        -- need to wait for snap animations to finish.
+        setIndex(closestIndexToOffset())
+    end
+
+    -- Animate to `steps` letters away.
+    local function moveLetter(self, steps)
+        setIndex(index + steps)
+        animateOffsetTo((index - 1) * size.height)
+    end
+
+    local function getLetter(self)
+        if (not self.inPlay) then
+            return ""
+        end
+
+        return letters[index]
+    end
 
     -- Do anything that needs to run on every frame.
-    update = function(self)
+    local function update(self)
         -- If we've configured an animator, get the next value and update our current offset to it.
-        if (self.animator ~= nil) then
+        if (animator ~= nil) then
             -- If we're already animating something, that means that either a button was pressed,
             -- or our snap timer expired and we're animating it into place. In either case, we no
             -- longer want the timer to be running.
-            if (self.snapTimer ~= nil) then
-                self.snapTimer:remove()
-                self.snapTimer = nil
+            if (snapTimer ~= nil) then
+                snapTimer:remove()
+                snapTimer = nil
             end
 
-            self:setOffset(self.animator:currentValue())
+            setOffset(animator:currentValue())
 
-            if (self.animator:ended()) then
-                self.animator = nil
+            if (animator:ended()) then
+                animator = nil
             end
         -- If we have a complete snapTimer, snap the letter into place.
-        elseif (self.snapTimer ~= nil and self.snapTimer.timeLeft == 0) then
+        elseif (snapTimer ~= nil and snapTimer.timeLeft == 0) then
             -- Kill the timer to stop us getting into an infinite loop.
-            self.snapTimer:remove()
-            self.snapTimer = nil
+            snapTimer:remove()
+            snapTimer = nil
 
-            -- self.offset starts at the top of the square, so the logical snapping point from a
-            -- visual perspective should act as if we were scrolled half a square further than we
-            -- actually are, so line up with the center line.
-            self:animateTo((self:closestIndex() - 1) * self.size.height)
+            animateOffsetTo((closestIndexToOffset() - 1) * size.height)
         end
     end
-}).extends()
 
-function BoardSquare:init(origin, size)
-    BoardSquare.super.init(self)
-
-    self.size = size
-
-    local boardSquare = self
-    local sprite = gfx.sprite.new()
-
+    -- Drawing callback.
     function sprite:draw(x, y, width, height)
-        -- Draw the border
+        -- Draw the border.
         gfx.drawRect(0, 0, self.width, self.height)
 
         -- If the square is not in play it should not render a letter.
@@ -186,9 +210,9 @@ function BoardSquare:init(origin, size)
 
         -- To keep the draw logic simple, we always draw the current, previous, and next letter,
         -- taking advantage of sprite clipping to only show what should be visible.
-        local prevLetter = "*" .. letters[boardSquare:previousIndex()] .. "*"
-        local currentLetter = "*" .. letters[boardSquare:currentIndex()] .. "*"
-        local nextLetter = "*" .. letters[boardSquare:nextIndex()] .. "*"
+        local prevLetter = "*" .. letters[previousRenderIndex()] .. "*"
+        local currentLetter = "*" .. letters[currentRenderIndex()] .. "*"
+        local nextLetter = "*" .. letters[nextRenderIndex()] .. "*"
 
         local prevWidth = gfx.getTextSize(prevLetter)
         local currentWidth = gfx.getTextSize(currentLetter)
@@ -198,7 +222,7 @@ function BoardSquare:init(origin, size)
         local letterHeight = 16
 
         -- The relative scroll offset within the height of the square.
-        local relativeOffset = boardSquare.offset % self.height
+        local relativeOffset = offset % self.height
 
         -- Draw the previous, current, and next letters one square height apart.
         gfx.drawText(
@@ -223,5 +247,9 @@ function BoardSquare:init(origin, size)
     sprite:setBounds(origin.x, origin.y, size.width, size.height)
     sprite:add()
 
-    self.sprite = sprite
+    -- Bind public methods
+    self.moveLetter = moveLetter
+    self.handleCranking = handleCranking
+    self.getLetter = getLetter
+    self.update = update
 end

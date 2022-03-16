@@ -43,10 +43,10 @@ function playdate.update()
         boardSquare:handleCranking(acceleratedChange)
 
     elseif (playdate.buttonJustPressed(playdate.kButtonUp)) then
-        boardSquare:moveToPreviousLetter()
+        boardSquare:moveLetter(-1)
 
     elseif (playdate.buttonJustPressed(playdate.kButtonDown)) then
-        boardSquare:moveToNextLetter()
+        boardSquare:moveLetter(1)
 
     elseif (playdate.buttonJustPressed(playdate.kButtonLeft)) then
         if (activeSquare.position > 1) then
