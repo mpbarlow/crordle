@@ -4,6 +4,7 @@ import "CoreLibs/animator"
 import "CoreLibs/timer"
 
 local gfx <const> = playdate.graphics
+local pieceStates <const> = constants.pieceStates
 
 local letters <const> = {
     "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
@@ -14,24 +15,27 @@ local lettersPerCrank <const> = 3
 local animationDuration <const> = 250
 local snapTimeout <const> = 1000
 
--- BoardSquare encapsulates a single letter selection.
+-- Piece encapsulates a single letter selection.
 -- Rendering is modelled as an endlessly scrolling, wrapping list. The previous, current, and next
 -- letters are rendered size.height pixels apart, with the entire thing shifted by offset % height.
 -- The current letter seamlessly becomes the last letter (and the next the current) as scrolling
 -- occurs, by mapping the offset over the 26 letters.
-class('BoardSquare', {
+class('Piece', {
     -- Squares that are not yet in play do not render a letter.
-    inPlay = false
+    inPlay = false,
+
+    -- Track the current play state of our piece. Each piece starts unchecked.
+    pieceState = pieceStates.kSquareUnchecked
 }).extends()
 
-function BoardSquare:init(origin, size)
-    BoardSquare.super.init(self)
+function Piece:init(origin, size)
+    Piece.super.init(self)
 
     -- Alias self to allow the sprite draw callback to read data from this.
-    local boardSquare = self
+    local piece = self
 
     -- Store the letter index. This is the source of truth for what letter is actually selected in
-    -- the square.
+    -- the piece.
     local index = 1
     local maxIndex <const> = #letters
 
@@ -99,8 +103,8 @@ function BoardSquare:init(origin, size)
         index = newIndex
     end
 
-    -- currentRenderIndex is whichever index/letter the top of the square is currently inside.
-    -- However, having scrolled more than half a square in either direction, we're actually closer
+    -- currentRenderIndex is whichever index/letter the top of the piece is currently inside.
+    -- However, having scrolled more than half a piece in either direction, we're actually closer
     -- to the next/previous letter. As such, we want to snap to *that* letter, not back to whatever
     -- we were on before.
     local function closestIndexToOffset()
@@ -200,12 +204,30 @@ function BoardSquare:init(origin, size)
 
     -- Drawing callback.
     function sprite:draw(x, y, width, height)
+        -- Reset color and drawing modes.
+        gfx.setColor(gfx.kColorBlack)
+        gfx.setImageDrawMode(gfx.kDrawModeCopy)
+        gfx.setLineWidth(1)
+
         -- Draw the border.
         gfx.drawRect(0, 0, self.width, self.height)
 
-        -- If the square is not in play it should not render a letter.
-        if (not boardSquare.inPlay) then
+        -- If the piece is not in play it should not render a letter.
+        if (not piece.inPlay) then
+            gfx.setDitherPattern(0.5)
+            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
+
             return
+        end
+
+        -- If our piece is totally wrong...
+        if (piece.pieceState == pieceStates.kSquareIncorrect) then
+            -- ...fill the piece black...
+            gfx.setColor(gfx.kColorBlack)
+            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
+
+            -- ...and draw white text.
+            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
         end
 
         -- To keep the draw logic simple, we always draw the current, previous, and next letter,
@@ -221,10 +243,10 @@ function BoardSquare:init(origin, size)
         -- getTextSize reports back a height of 20px which doesn't seem to be right...
         local letterHeight = 16
 
-        -- The relative scroll offset within the height of the square.
+        -- The relative scroll offset within the height of the piece.
         local relativeOffset = offset % self.height
 
-        -- Draw the previous, current, and next letters one square height apart.
+        -- Draw the previous, current, and next letters one piece height apart.
         gfx.drawText(
             prevLetter,
             (self.width / 2) - (prevWidth / 2),

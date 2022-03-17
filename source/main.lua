@@ -2,69 +2,160 @@ import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/timer"
 
-import "BoardSquare"
-import "ActiveRing"
 import "support"
+import "Piece"
+import "Selection"
 
 local gfx <const> = playdate.graphics
+local gameStates <const> = constants.gameStates
 
 local wordList <const> = import "words"
+local word = "hello"
 
-local boardOrigin <const>  = {x = 10, y = 10}
-local squareSize <const>   = {width = 30, height = 30}
-local squareMargin <const> = 5
+local boardOrigin <const>        = {x = 10, y = 10}
+local pieceSize <const>          = {width = 30, height = 30}
+local pieceMargin <const>        = 5
+local submitButtonBounds <const> = playdate.geometry.rect.new(200, 100, 150, 40)
 
 local board <const> = {}
-local activeSquare  = {row = 1, position = 1}
+local activePiece   = {row = 1, position = 1}
+local gameState     = gameStates.kWordEntry
 
-local function makeBoard()
+local submitButtonSprite <const> = gfx.sprite.new()
+
+-- Perform the initial set up to configure the game board and UI.
+local function setUpGame()
+    -- Build the board as a 5x6 grid of Pieces.
     for row = 1, 6 do
         board[row] = {}
 
-        for square = 1, 5 do
-            local x = ((square - 1) * squareSize.width) + ((square - 1) * squareMargin) + boardOrigin.x
-            local y = ((row - 1) * squareSize.height) + ((row - 1) * squareMargin) + boardOrigin.y
+        for position = 1, 5 do
+            local x = ((position - 1) * pieceSize.width) + ((position - 1) * pieceMargin) + boardOrigin.x
+            local y = ((row - 1) * pieceSize.height) + ((row - 1) * pieceMargin) + boardOrigin.y
 
-            board[row][square] = BoardSquare({x = x, y = y}, squareSize)
+            board[row][position] = Piece({x = x, y = y}, pieceSize)
+        end
+    end
+
+    -- Configure how the submit button draws itself.
+    function submitButtonSprite:draw(x, y, width, height)
+        gfx.setColor(gfx.kColorBlack)
+        gfx.setLineWidth(1)
+
+        -- When in entry mode, draw the "unselected" state, i.e. black text on an outline button
+        if (gameState == gameStates.kWordEntry) then
+            gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
+            gfx.drawRoundRect(0, 0, self.width, self.height, 15)
+
+        -- Otherwise fill the button and draw white text.
+        elseif (gameState == gameStates.kWordSubmit) then
+            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+            gfx.fillRoundRect(0, 0, self.width, self.height, 15)
+        end
+
+        gfx.drawTextAligned(
+            "*Submit*",
+            self.width / 2,
+            (self.height / 2) - 8,
+            kTextAlignment.center
+        )
+    end
+
+    submitButtonSprite:setBounds(submitButtonBounds)
+    submitButtonSprite:add()
+end
+
+setUpGame()
+
+local selection = Selection(boardOrigin, pieceSize, pieceMargin)
+selection:moveTo(activePiece.row, activePiece.position)
+
+local function switchToState(newState)
+    if (newState == gameStates.kWordEntry) then
+        selection:moveTo(activePiece.row, activePiece.position)
+    elseif (newState == gameStates.kWordSubmit) then
+        selection:setHidden()
+    end
+
+    submitButtonSprite:markDirty()
+    gameState = newState
+end
+
+function checkEntryAgainstWord()
+    local enteredWord = ""
+
+    for position = 1, 5 do
+        enteredWord = enteredWord .. string.lower(board[activePiece.row][position]:getLetter())
+    end
+
+    print(enteredWord)
+end
+
+local function handleInput()
+    -- Input handlers for when the player is entering a word
+    if (gameState == gameStates.kWordEntry) then
+        local change, acceleratedChange = playdate.getCrankChange()
+
+        -- Handle changing letters by cranking if the user has moved the crank.
+        if (acceleratedChange ~= 0) then
+            board[activePiece.row][activePiece.position]:handleCranking(acceleratedChange)
+
+        -- Handle changing letters by pressing up or down
+        elseif (playdate.buttonJustPressed(playdate.kButtonUp)) then
+            board[activePiece.row][activePiece.position]:moveLetter(-1)
+
+        elseif (playdate.buttonJustPressed(playdate.kButtonDown)) then
+            board[activePiece.row][activePiece.position]:moveLetter(1)
+
+        -- Left/B are used to move back to the previous square.
+        elseif (
+            playdate.buttonJustPressed(playdate.kButtonLeft)
+            or playdate.buttonJustPressed(playdate.kButtonB)
+        ) then
+            if (activePiece.position > 1) then
+                activePiece.position -= 1
+                selection:moveTo(activePiece.row, activePiece.position)
+            end
+
+        -- Right/A are used to enter a letter and advance to the next square.
+        elseif (
+            playdate.buttonJustPressed(playdate.kButtonRight)
+            or playdate.buttonJustPressed(playdate.kButtonA)
+        ) then
+            if (activePiece.position < 5) then
+                activePiece.position += 1
+                selection:moveTo(activePiece.row, activePiece.position)
+            else
+                -- If we go right off the edge, move into submit mode.
+                switchToState(gameStates.kWordSubmit)
+            end
+        end
+
+    -- In submit mode we are focussed on the submit button. We can only move back out of submit
+    -- mode, or confirm our submission.
+    elseif (gameState == gameStates.kWordSubmit) then
+        if (
+            playdate.buttonJustPressed(playdate.kButtonLeft)
+            or playdate.buttonJustPressed(playdate.kButtonB)
+        ) then
+            switchToState(gameStates.kWordEntry)
+
+        elseif (
+            playdate.buttonJustPressed(playdate.kButtonRight)
+            or playdate.buttonJustPressed(playdate.kButtonA)
+        ) then
+            switchToState(gameStates.kCheckingEntry)
         end
     end
 end
 
-makeBoard()
-
-local activeRing = ActiveRing(boardOrigin, squareSize, squareMargin)
-
-local boardSquare = board[activeSquare.row][activeSquare.position]
-
 function playdate.update()
-    local change, acceleratedChange = playdate.getCrankChange()
+    handleInput()
 
-    if (acceleratedChange ~= 0) then
-        boardSquare:handleCranking(acceleratedChange)
-
-    elseif (playdate.buttonJustPressed(playdate.kButtonUp)) then
-        boardSquare:moveLetter(-1)
-
-    elseif (playdate.buttonJustPressed(playdate.kButtonDown)) then
-        boardSquare:moveLetter(1)
-
-    elseif (playdate.buttonJustPressed(playdate.kButtonLeft)) then
-        if (activeSquare.position > 1) then
-            activeSquare.position -= 1
-            activeRing:moveTo(activeSquare.row, activeSquare.position)
-        end
-
-    elseif (playdate.buttonJustPressed(playdate.kButtonRight)) then
-        if (activeSquare.position < 5) then
-            activeSquare.position += 1
-            activeRing:moveTo(activeSquare.row, activeSquare.position)
-        end
-    end
-
-    for row = 1, activeSquare.row do
-        for square = 1, 5 do
-            board[row][square].inPlay = square <= activeSquare.position
-            board[row][square]:update()
+    for row = 1, activePiece.row do
+        for position = 1, 5 do
+            board[row][position].inPlay = position <= activePiece.position
+            board[row][position]:update()
         end
     end
 
@@ -72,6 +163,4 @@ function playdate.update()
 
     playdate.timer.updateTimers()
     playdate.drawFPS(380, 225)
-
-    boardSquare = board[activeSquare.row][activeSquare.position]
 end
