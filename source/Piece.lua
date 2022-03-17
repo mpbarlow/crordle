@@ -11,6 +11,17 @@ local letters <const> = {
     "T", "U", "V", "W", "X", "Y", "Z"
 }
 
+local diagonalPattern <const> = {
+    tonumber('11101111', 2),
+    tonumber('11011111', 2),
+    tonumber('10111111', 2),
+    tonumber('01111111', 2),
+    tonumber('11111110', 2),
+    tonumber('11111101', 2),
+    tonumber('11111011', 2),
+    tonumber('11110111', 2),
+}
+
 local lettersPerCrank <const> = 3
 local animationDuration <const> = 250
 local snapTimeout <const> = 1000
@@ -22,10 +33,7 @@ local snapTimeout <const> = 1000
 -- occurs, by mapping the offset over the 26 letters.
 class('Piece', {
     -- Squares that are not yet in play do not render a letter.
-    inPlay = false,
-
-    -- Track the current play state of our piece. Each piece starts unchecked.
-    pieceState = pieceStates.kSquareUnchecked
+    inPlay = false
 }).extends()
 
 function Piece:init(origin, size)
@@ -33,6 +41,9 @@ function Piece:init(origin, size)
 
     -- Alias self to allow the sprite draw callback to read data from this.
     local piece = self
+
+    -- Track the current play state of our piece. Each piece starts unchecked.
+    local pieceState = pieceStates.kPieceUnchecked
 
     -- Store the letter index. This is the source of truth for what letter is actually selected in
     -- the piece.
@@ -64,13 +75,13 @@ function Piece:init(origin, size)
         -- and always take whichever path is shortest.
         local oppositeEquivalent
 
-        if (to > offset) then
+        if to > offset then
             oppositeEquivalent = to - maxOffset
         else
             oppositeEquivalent = maxOffset + to
         end
 
-        if (math.abs(oppositeEquivalent - offset) < math.abs(to - offset)) then
+        if math.abs(oppositeEquivalent - offset) < math.abs(to - offset) then
             to = oppositeEquivalent
         end
 
@@ -82,9 +93,9 @@ function Piece:init(origin, size)
     -- (e.g. we can animate from 0 to -30 and this function will handle wrapping it for us).
     -- Because offset determines where the letter is drawn, we also mark the sprite as dirty.
     local function setOffset(newOffset)
-        if (newOffset < 0) then
+        if newOffset < 0 then
             newOffset += maxOffset
-        elseif (newOffset >= maxOffset) then
+        elseif newOffset >= maxOffset then
             newOffset -= maxOffset
         end
 
@@ -94,9 +105,9 @@ function Piece:init(origin, size)
 
     -- Similar to setOffset, but allow us to set the current letter index instead.
     local function setIndex(newIndex)
-        if (newIndex < 1) then
+        if newIndex < 1 then
             newIndex += maxIndex
-        elseif (newIndex > maxIndex) then
+        elseif newIndex > maxIndex then
             newIndex -= maxIndex
         end
 
@@ -120,7 +131,7 @@ function Piece:init(origin, size)
     local function previousRenderIndex()
         local currentIndex = currentRenderIndex()
 
-        if (currentIndex - 1 <= 0) then
+        if currentIndex - 1 <= 0 then
             return #letters
         end
 
@@ -131,7 +142,7 @@ function Piece:init(origin, size)
     local function nextRenderIndex()
         local currentIndex = currentRenderIndex()
 
-        if (currentIndex + 1 > maxIndex) then
+        if currentIndex + 1 > maxIndex then
             return 1
         end
 
@@ -144,7 +155,7 @@ function Piece:init(origin, size)
         -- crank takes priority.
         animator = nil
 
-        if (snapTimer == nil) then
+        if snapTimer == nil then
             -- This timer will track how long it's been since cranking stopped, so after a brief
             -- pause we can snap the letter into place.
             snapTimer = playdate.timer.new(snapTimeout)
@@ -168,32 +179,37 @@ function Piece:init(origin, size)
     end
 
     local function getLetter(self)
-        if (not self.inPlay) then
+        if not self.inPlay then
             return ""
         end
 
         return letters[index]
     end
 
+    local function setPieceState(self, newState)
+        pieceState = newState
+        sprite:markDirty()
+    end
+
     -- Do anything that needs to run on every frame.
     local function update(self)
         -- If we've configured an animator, get the next value and update our current offset to it.
-        if (animator ~= nil) then
+        if animator ~= nil then
             -- If we're already animating something, that means that either a button was pressed,
             -- or our snap timer expired and we're animating it into place. In either case, we no
             -- longer want the timer to be running.
-            if (snapTimer ~= nil) then
+            if snapTimer ~= nil then
                 snapTimer:remove()
                 snapTimer = nil
             end
 
             setOffset(animator:currentValue())
 
-            if (animator:ended()) then
+            if animator:ended() then
                 animator = nil
             end
         -- If we have a complete snapTimer, snap the letter into place.
-        elseif (snapTimer ~= nil and snapTimer.timeLeft == 0) then
+        elseif snapTimer ~= nil and snapTimer.timeLeft == 0 then
             -- Kill the timer to stop us getting into an infinite loop.
             snapTimer:remove()
             snapTimer = nil
@@ -213,21 +229,27 @@ function Piece:init(origin, size)
         gfx.drawRect(0, 0, self.width, self.height)
 
         -- If the piece is not in play it should not render a letter.
-        if (not piece.inPlay) then
+        if not piece.inPlay then
             gfx.setDitherPattern(0.5)
             gfx.fillRect(1, 1, self.width - 2, self.height - 2)
 
             return
         end
 
-        -- If our piece is totally wrong...
-        if (piece.pieceState == pieceStates.kSquareIncorrect) then
-            -- ...fill the piece black...
-            gfx.setColor(gfx.kColorBlack)
+        -- Apply shading based on piece state.
+        -- If the letter is totally incorrect, fill the piece black and draw white text.
+        if pieceState == pieceStates.kPieceIncorrect then
+            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
+            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+
+        -- If the letter is in the wrong location, draw diagonal lines
+        elseif pieceState == pieceStates.kPieceWrongLocation then
+            gfx.setPattern(diagonalPattern)
             gfx.fillRect(1, 1, self.width - 2, self.height - 2)
 
-            -- ...and draw white text.
-            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+            -- Draw a white circle around the letter so we can still see it.
+            gfx.setColor(gfx.kColorWhite)
+            gfx.fillCircleInRect(4, 4, self.width - 8, self.height - 8)
         end
 
         -- To keep the draw logic simple, we always draw the current, previous, and next letter,
@@ -270,8 +292,9 @@ function Piece:init(origin, size)
     sprite:add()
 
     -- Bind public methods
-    self.moveLetter = moveLetter
     self.handleCranking = handleCranking
+    self.moveLetter = moveLetter
     self.getLetter = getLetter
+    self.setPieceState = setPieceState
     self.update = update
 end

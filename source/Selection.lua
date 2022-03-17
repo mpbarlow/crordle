@@ -42,7 +42,7 @@ function Selection:init(origin, squareSize, squareMargin)
     end
 
     function sprite:draw(x, y, width, height)
-        if (hidden) then
+        if hidden then
             return
         end
 

@@ -1,9 +1,9 @@
 constants = {
     pieceStates = {
-        kSquareUnchecked = 0,
-        kSquareWrongLocation = 1,
-        kSquareIncorrect = 2,
-        kSquareCorrect = 3
+        kPieceUnchecked = 0,
+        kPieceWrongLocation = 1,
+        kPieceIncorrect = 2,
+        kPieceCorrect = 3
     },
     gameStates = {
         kWordEntry = 0,
