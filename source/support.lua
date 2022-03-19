@@ -9,6 +9,11 @@ constants = {
         kWordEntry = 0,
         kWordSubmit = 1,
         kCheckingEntry = 2
+    },
+    wordStates = {
+        kWordNotInList = 0,
+        kWordIncorrect = 1,
+        kWordCorrect = 2
     }
 }
 

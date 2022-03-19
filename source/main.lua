@@ -3,12 +3,15 @@ import "CoreLibs/sprites"
 import "CoreLibs/timer"
 
 import "support"
+import "checkEntry"
+
 import "Piece"
 import "Selection"
-import "Checker"
 
 local gfx <const> = playdate.graphics
+
 local gameStates <const> = constants.gameStates
+local wordStates <const> = constants.wordStates
 
 local wordList <const> = import "words"
 local word = "hello"
@@ -17,6 +20,9 @@ local boardOrigin <const> = {x = 10, y = 10}
 local pieceSize <const>   = {width = 30, height = 30}
 local pieceMargin <const> = 5
 
+local letters <const> = 5
+local guesses <const> = 6
+
 local submitButtonBounds <const> = playdate.geometry.rect.new(200, 100, 150, 40)
 local submitButtonSprite <const> = gfx.sprite.new()
 
@@ -24,15 +30,15 @@ local board <const> = {}
 local activePiece   = {row = 1, position = 1}
 local gameState     = gameStates.kWordEntry
 
-local wordChecker = nil
+local wordCheckResults = nil
 
 -- Perform the initial set up to configure the game board and UI.
 local function setUpGame()
     -- Build the board as a 5x6 grid of Pieces.
-    for row = 1, 6 do
+    for row = 1, guesses do
         board[row] = {}
 
-        for position = 1, 5 do
+        for position = 1, letters do
             local x = ((position - 1) * pieceSize.width) + ((position - 1) * pieceMargin) + boardOrigin.x
             local y = ((row - 1) * pieceSize.height) + ((row - 1) * pieceMargin) + boardOrigin.y
 
@@ -73,6 +79,7 @@ setUpGame()
 local selection = Selection(boardOrigin, pieceSize, pieceMargin)
 selection:moveTo(activePiece.row, activePiece.position)
 
+-- Handle game state transitions.
 local function moveToState(newState)
     if newState == gameStates.kWordEntry then
         selection:moveTo(activePiece.row, activePiece.position)
@@ -83,12 +90,13 @@ local function moveToState(newState)
         submitButtonSprite:markDirty()
 
     elseif newState == gameStates.kCheckingEntry then
-        wordChecker = Checker(board[activePiece.row], word)
+        wordCheckResults = checkEntry(board[activePiece.row], word, wordList)
     end
 
     gameState = newState
 end
 
+-- Handles all input based on current game state.
 local function handleInput()
     -- Input handlers for when the player is entering a word
     if gameState == gameStates.kWordEntry then
@@ -150,20 +158,50 @@ local function handleInput()
     end
 end
 
+-- React to results of a word that was just entered.
+local function handleWordCheck()
+    -- If the word was not even in our list, move back to entry mode.
+    -- TODO: Flash up a message saying "not in word list"
+    if wordCheckResults.state == wordStates.kWordNotInList then
+        moveToState(gameStates.kWordEntry)
+    else
+        -- Set each piece state one second apart, to give the appearance of checking the result
+        -- letter by letter.
+        for position = 1, letters do
+            local piece = board[activePiece.row][position]
+            local state = wordCheckResults.pieces[position]
+
+            playdate.timer.performAfterDelay((position - 1) * 1000, function ()
+                piece:setPieceState(state)
+            end)
+        end
+
+        -- After all the pieces have animated, move to the next row and reset back into word entry
+        -- mode.
+        playdate.timer.performAfterDelay(letters * 1000, function ()
+            activePiece.row += 1
+            activePiece.position = 1
+
+            moveToState(gameStates.kWordEntry)
+        end)
+    end
+end
+
 function playdate.update()
+    -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
     handleInput()
 
-    if wordChecker ~= nil and wordChecker.done then
-        activePiece.row += 1
-        activePiece.position = 1
+    -- If we've got results from an entered word...
+    if wordCheckResults ~= nil then
+        -- ...handle them accordingly...
+        handleWordCheck()
 
-        moveToState(gameStates.kWordEntry)
-
-        wordChecker = nil
+        -- ...then unset them so we don't handle them multiple times.
+        wordCheckResults = nil
     end
 
     for row = 1, activePiece.row do
-        for position = 1, 5 do
+        for position = 1, letters do
             board[row][position].inPlay = row < activePiece.row or position <= activePiece.position
             board[row][position]:update()
         end
