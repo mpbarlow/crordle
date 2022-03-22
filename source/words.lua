@@ -5,5 +5,6 @@ return {
     "beast",
     "beefy",
     "beget",
+    "hello",
     "words"
 }

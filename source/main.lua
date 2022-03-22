@@ -17,8 +17,11 @@ local wordList <const> = import "words"
 local word = "hello"
 
 local boardOrigin <const> = {x = 10, y = 10}
-local pieceSize <const>   = {width = 30, height = 30}
+local pieceSize <const> = {width = 30, height = 30}
 local pieceMargin <const> = 5
+
+-- The number of milliseconds to wait between checking each letter when submitting a word.
+local checkDuration <const> = 500
 
 local letters <const> = 5
 local guesses <const> = 6
@@ -27,8 +30,8 @@ local submitButtonBounds <const> = playdate.geometry.rect.new(200, 100, 150, 40)
 local submitButtonSprite <const> = gfx.sprite.new()
 
 local board <const> = {}
-local activePiece   = {row = 1, position = 1}
-local gameState     = gameStates.kWordEntry
+local activePiece = {row = 1, position = 1}
+local gameState = gameStates.kWordEntry
 
 local wordCheckResults = nil
 
@@ -171,20 +174,36 @@ local function handleWordCheck()
             local piece = board[activePiece.row][position]
             local state = wordCheckResults.pieces[position]
 
-            playdate.timer.performAfterDelay((position - 1) * 1000, function ()
+            playdate.timer.performAfterDelay((position - 1) * checkDuration, function ()
                 piece:setPieceState(state)
             end)
         end
 
         -- After all the pieces have animated, move to the next row and reset back into word entry
-        -- mode.
-        playdate.timer.performAfterDelay(letters * 1000, function ()
-            activePiece.row += 1
-            activePiece.position = 1
+        -- mode. Waiting an extra half beat just feels better for some reason.
+        playdate.timer.performAfterDelay(
+            (letters * checkDuration) + (checkDuration / 2),
+            function ()
+                activePiece.row += 1
+                activePiece.position = 1
 
-            moveToState(gameStates.kWordEntry)
-        end)
+                moveToState(gameStates.kWordEntry)
+            end
+        )
     end
+end
+
+local function updatePieceAt(row, position)
+    local pieceShouldBeInPlay = row < activePiece.row or position <= activePiece.position
+
+    -- When first adding a piece to play, set its initial letter to the last selected letter rather
+    -- than making the player go from "A" every time.
+    if position > 1 and not board[row][position].inPlay and pieceShouldBeInPlay then
+        board[row][position]:setLetter(board[row][position - 1]:getLetter())
+    end
+
+    board[row][position].inPlay = pieceShouldBeInPlay
+    board[row][position]:update()
 end
 
 function playdate.update()
@@ -200,10 +219,10 @@ function playdate.update()
         wordCheckResults = nil
     end
 
+    -- Update the pieces in play.
     for row = 1, activePiece.row do
         for position = 1, letters do
-            board[row][position].inPlay = row < activePiece.row or position <= activePiece.position
-            board[row][position]:update()
+            updatePieceAt(row, position)
         end
     end
 

@@ -11,6 +11,7 @@ local letters <const> = {
     "T", "U", "V", "W", "X", "Y", "Z"
 }
 
+-- A single-pixel wide diagonal stripe pattern to use for letters in the incorrect location.
 local diagonalPattern <const> = {
     tonumber('11101111', 2),
     tonumber('11011111', 2),
@@ -23,7 +24,8 @@ local diagonalPattern <const> = {
 }
 
 local lettersPerCrank <const> = 3
-local animationDuration <const> = 250
+local snapDuration <const> = 250
+local flipDuration <const> = 500
 local snapTimeout <const> = 1000
 
 -- Piece encapsulates a single letter selection.
@@ -59,7 +61,8 @@ function Piece:init(origin, size)
     local sprite = gfx.sprite.new()
 
     -- Handles animating to a new position when using the buttons.
-    local animator = nil
+    local offsetAnimator = nil
+    local flipAnimator = nil
 
     -- Tracks how long it has been since cranking stopped. After the timer ends, the display will
     -- "snap" to the nearest letter.
@@ -85,7 +88,7 @@ function Piece:init(origin, size)
             to = oppositeEquivalent
         end
 
-        animator = gfx.animator.new(animationDuration, offset, to)
+        offsetAnimator = gfx.animator.new(snapDuration, offset, to)
     end
 
     -- Set the offset to an explicit value, wrapping at either end. The wrapping functionality
@@ -153,7 +156,7 @@ function Piece:init(origin, size)
     local function handleCranking(self, change)
         -- If we're currently animating to a new selection from a button press, cancel it so the
         -- crank takes priority.
-        animator = nil
+        offsetAnimator = nil
 
         if snapTimer == nil then
             -- This timer will track how long it's been since cranking stopped, so after a brief
@@ -178,6 +181,7 @@ function Piece:init(origin, size)
         animateOffsetTo((index - 1) * size.height)
     end
 
+    -- Return the selected letter.
     local function getLetter(self)
         if not self.inPlay then
             return ""
@@ -186,15 +190,21 @@ function Piece:init(origin, size)
         return letters[index]
     end
 
+    -- Set the initial letter.
+    local function setLetter(self, letter)
+        index = table.indexOfElement(letters, string.upper(letter))
+        offset = (index - 1) * size.height
+    end
+
     local function setPieceState(self, newState)
         pieceState = newState
-        sprite:markDirty()
+        flipAnimator = gfx.animator.new(flipDuration, -1, 1)
     end
 
     -- Do anything that needs to run on every frame.
     local function update(self)
         -- If we've configured an animator, get the next value and update our current offset to it.
-        if animator ~= nil then
+        if offsetAnimator ~= nil then
             -- If we're already animating something, that means that either a button was pressed,
             -- or our snap timer expired and we're animating it into place. In either case, we no
             -- longer want the timer to be running.
@@ -203,10 +213,10 @@ function Piece:init(origin, size)
                 snapTimer = nil
             end
 
-            setOffset(animator:currentValue())
+            setOffset(offsetAnimator:currentValue())
 
-            if animator:ended() then
-                animator = nil
+            if offsetAnimator:ended() then
+                offsetAnimator = nil
             end
         -- If we have a complete snapTimer, snap the letter into place.
         elseif snapTimer ~= nil and snapTimer.timeLeft == 0 then
@@ -215,6 +225,16 @@ function Piece:init(origin, size)
             snapTimer = nil
 
             animateOffsetTo((closestIndexToOffset() - 1) * size.height)
+        end
+
+        -- If we have a flip animator, we just need to tell the sprite to update, because it will
+        -- ready directly from the animator itself as there is no separate state to update.
+        if flipAnimator ~= nil then
+            sprite:markDirty()
+
+            if flipAnimator:ended() then
+                flipAnimator = nil
+            end
         end
     end
 
@@ -225,8 +245,23 @@ function Piece:init(origin, size)
         gfx.setImageDrawMode(gfx.kDrawModeCopy)
         gfx.setLineWidth(1)
 
+        local yOffset = 0
+        local height = self.height
+        local flipProgress = 0
+
+        if flipAnimator ~= nil then
+            flipProgress = flipAnimator:currentValue()
+
+            -- We can simulate flipping by shrinking the height we draw and moving the rectangle
+            -- closer to the center at the same time.
+            -- We animate from -1 to 1 and then abs it to allow us to do a parabolic animation
+            -- using a single animator.
+            yOffset = (self.height / 2) - ((self.height / 2) * math.abs(flipProgress))
+            height = self.height * math.abs(flipProgress)
+        end
+
         -- Draw the border.
-        gfx.drawRect(0, 0, self.width, self.height)
+        gfx.drawRect(0, yOffset, self.width, height)
 
         -- If the piece is not in play it should not render a letter.
         if not piece.inPlay then
@@ -236,20 +271,34 @@ function Piece:init(origin, size)
             return
         end
 
-        -- Apply shading based on piece state.
-        -- If the letter is totally incorrect, fill the piece black and draw white text.
-        if pieceState == pieceStates.kPieceIncorrect then
-            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
-            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+        -- If we're in the first half of a flip animation, animate to an increasingly darker dither
+        -- to simulate shading.
+        if flipProgress < 0 then
+            gfx.setDitherPattern(math.abs(flipProgress))
+            gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
 
-        -- If the letter is in the wrong location, draw diagonal lines
-        elseif pieceState == pieceStates.kPieceWrongLocation then
-            gfx.setPattern(diagonalPattern)
-            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
+        -- Otherwise apply shading based on piece state.
+        else
+            -- If the letter is totally incorrect, fill the piece black and draw white text.
+            if pieceState == pieceStates.kPieceIncorrect then
+                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
+                gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
 
-            -- Draw a white circle around the letter so we can still see it.
-            gfx.setColor(gfx.kColorWhite)
-            gfx.fillCircleInRect(4, 4, self.width - 8, self.height - 8)
+            -- If the letter is in the wrong location, draw diagonal lines
+            elseif pieceState == pieceStates.kPieceWrongLocation then
+                gfx.setPattern(diagonalPattern)
+                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
+
+                -- Draw a white circle around the letter so we can still see it.
+                gfx.setColor(gfx.kColorWhite)
+                gfx.fillEllipseInRect(4, yOffset + 4, self.width - 8, math.max(0, height - 8))
+            end
+        end
+
+        -- If we're animating a flip we don't want to draw the letter as we'll see it through the
+        -- animation.
+        if flipAnimator ~= nil then
+            return
         end
 
         -- To keep the draw logic simple, we always draw the current, previous, and next letter,
@@ -295,6 +344,7 @@ function Piece:init(origin, size)
     self.handleCranking = handleCranking
     self.moveLetter = moveLetter
     self.getLetter = getLetter
+    self.setLetter = setLetter
     self.setPieceState = setPieceState
     self.update = update
 end
