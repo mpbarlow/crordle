@@ -26,7 +26,7 @@ local checkDuration <const> = 500
 local letters <const> = 5
 local guesses <const> = 6
 
-local submitButtonBounds <const> = playdate.geometry.rect.new(200, 100, 150, 40)
+local submitButtonBounds <const> = playdate.geometry.rect.new(215, 100, 150, 40)
 local submitButtonSprite <const> = gfx.sprite.new()
 
 local board <const> = {}
@@ -57,6 +57,13 @@ local function setUpGame()
         -- When in entry mode, draw the "unselected" state, i.e. black text on an outline button
         if gameState == gameStates.kWordEntry then
             gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
+
+            -- Fill the background in
+            gfx.setColor(gfx.kColorWhite)
+            gfx.fillRoundRect(0, 0, self.width, self.height, 15)
+
+            -- Draw outline
+            gfx.setColor(gfx.kColorBlack)
             gfx.drawRoundRect(0, 0, self.width, self.height, 15)
 
         -- Otherwise fill the button and draw white text.
@@ -75,6 +82,24 @@ local function setUpGame()
 
     submitButtonSprite:setBounds(submitButtonBounds)
     submitButtonSprite:add()
+
+    local dotPattern <const> = {
+        tonumber('11111111', 2),
+        tonumber('11111111', 2),
+        tonumber('11111111', 2),
+        tonumber('11101111', 2),
+        tonumber('11111111', 2),
+        tonumber('11111111', 2),
+        tonumber('11111111', 2),
+        tonumber('11111111', 2),
+    }
+
+    gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
+        gfx.setClipRect(x, y, width, height)
+        gfx.setPattern(dotPattern)
+        gfx.fillRect(x, y, width, height)
+        gfx.clearClipRect()
+    end)
 end
 
 setUpGame()
@@ -97,6 +122,37 @@ local function moveToState(newState)
     end
 
     gameState = newState
+end
+
+local function displayModal(message, durationMs, returnState)
+    -- Better as assertion?
+    if gameState == gameStates.kDisplayingMessage then
+        return
+    end
+
+    gameState = gameStates.kDisplayingMessage
+
+    local sprite = gfx.sprite.new()
+
+    function sprite:draw(x, y, width, height)
+        gfx.setColor(gfx.kColorWhite)
+        gfx.fillRoundRect(0, 0, self.width, self.height, 10)
+
+        gfx.setColor(gfx.kColorBlack)
+        gfx.drawRoundRect(0, 0, self.width, self.height, 10)
+
+        gfx.drawTextAligned(message, self.width / 2, (self.height / 2) - 8, kTextAlignment.center)
+    end
+
+    sprite:setBounds(50, 70, 300, 100)
+    sprite:setZIndex(10)
+
+    sprite:add()
+
+    playdate.timer.performAfterDelay(durationMs, function ()
+        sprite:remove()
+        moveToState(returnState)
+    end)
 end
 
 -- Handles all input based on current game state.
@@ -161,12 +217,20 @@ local function handleInput()
     end
 end
 
+local function handleGameWon()
+    displayModal("Splendid!", 5000, gameStates.kGameWon)
+end
+
+local function handleGameOver()
+    displayModal("Bad luck!", 5000, gameStates.kGameLost)
+end
+
 -- React to results of a word that was just entered.
 local function handleWordCheck()
     -- If the word was not even in our list, move back to entry mode.
-    -- TODO: Flash up a message saying "not in word list"
     if wordCheckResults.state == wordStates.kWordNotInList then
-        moveToState(gameStates.kWordEntry)
+        displayModal("Word not in list.", 2000, gameStates.kWordEntry)
+
     else
         -- Set each piece state one second apart, to give the appearance of checking the result
         -- letter by letter.
@@ -179,11 +243,23 @@ local function handleWordCheck()
             end)
         end
 
+        local wordState <const> = wordCheckResults.state
+
         -- After all the pieces have animated, move to the next row and reset back into word entry
         -- mode. Waiting an extra half beat just feels better for some reason.
         playdate.timer.performAfterDelay(
             (letters * checkDuration) + (checkDuration / 2),
             function ()
+                if wordState == wordStates.kWordCorrect then
+                    handleGameWon()
+                    return
+                end
+
+                if activePiece.row == guesses then
+                    handleGameOver()
+                    return
+                end
+
                 activePiece.row += 1
                 activePiece.position = 1
 
@@ -227,7 +303,6 @@ function playdate.update()
     end
 
     gfx.sprite.update()
-
     playdate.timer.updateTimers()
     playdate.drawFPS(380, 225)
 end

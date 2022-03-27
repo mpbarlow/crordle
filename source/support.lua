@@ -8,7 +8,10 @@ constants = {
     gameStates = {
         kWordEntry = 0,
         kWordSubmit = 1,
-        kCheckingEntry = 2
+        kCheckingEntry = 2,
+        kDisplayingModal = 3,
+        kGameWon = 4,
+        kGameLost = 5
     },
     wordStates = {
         kWordNotInList = 0,

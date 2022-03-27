@@ -292,6 +292,12 @@ function Piece:init(origin, size)
                 -- Draw a white circle around the letter so we can still see it.
                 gfx.setColor(gfx.kColorWhite)
                 gfx.fillEllipseInRect(4, yOffset + 4, self.width - 8, math.max(0, height - 8))
+
+            -- Otherwise, fill it white
+            else
+                gfx.setColor(gfx.kColorWhite)
+                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
+
             end
         end
 
