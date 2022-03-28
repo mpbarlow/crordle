@@ -9,9 +9,14 @@ constants = {
         kWordEntry = 0,
         kWordSubmit = 1,
         kCheckingEntry = 2,
-        kDisplayingModal = 3,
-        kGameWon = 4,
-        kGameLost = 5
+        kGameWon = 3,
+        kGameLost = 4
+    },
+    gameEvents = {
+        kStateTransitioned = 0,
+        kWordNotInList = 1,
+        kGameWon = 2,
+        kGameLost = 3
     },
     wordStates = {
         kWordNotInList = 0,
@@ -19,6 +24,13 @@ constants = {
         kWordCorrect = 2
     }
 }
+
+letters = 5
+guesses = 6
+
+boardOrigin = {x = 10, y = 17}
+pieceSize = {width = 30, height = 30}
+pieceMargin = 5
 
 function randomWord(words)
     return words[math.random(1, #words)]

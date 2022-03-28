@@ -13,14 +13,14 @@ local letters <const> = {
 
 -- A single-pixel wide diagonal stripe pattern to use for letters in the incorrect location.
 local diagonalPattern <const> = {
-    tonumber('11101111', 2),
-    tonumber('11011111', 2),
-    tonumber('10111111', 2),
-    tonumber('01111111', 2),
-    tonumber('11111110', 2),
-    tonumber('11111101', 2),
-    tonumber('11111011', 2),
-    tonumber('11110111', 2),
+    tonumber("11101111", 2),
+    tonumber("11011111", 2),
+    tonumber("10111111", 2),
+    tonumber("01111111", 2),
+    tonumber("11111110", 2),
+    tonumber("11111101", 2),
+    tonumber("11111011", 2),
+    tonumber("11110111", 2),
 }
 
 local lettersPerCrank <const> = 3
