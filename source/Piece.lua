@@ -4,7 +4,6 @@ import "CoreLibs/animator"
 import "CoreLibs/timer"
 
 local gfx <const> = playdate.graphics
-local pieceStates <const> = constants.pieceStates
 
 local letters <const> = {
     "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
@@ -45,7 +44,7 @@ function Piece:init(origin, size)
     local piece = self
 
     -- Track the current play state of our piece. Each piece starts unchecked.
-    local pieceState = pieceStates.kPieceUnchecked
+    local pieceState = kLetterStateUnchecked
 
     -- Store the letter index. This is the source of truth for what letter is actually selected in
     -- the piece.
@@ -280,12 +279,12 @@ function Piece:init(origin, size)
         -- Otherwise apply shading based on piece state.
         else
             -- If the letter is totally incorrect, fill the piece black and draw white text.
-            if pieceState == pieceStates.kPieceIncorrect then
+            if pieceState == kLetterStateIncorrect then
                 gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
                 gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
 
             -- If the letter is in the wrong location, draw diagonal lines
-            elseif pieceState == pieceStates.kPieceWrongLocation then
+            elseif pieceState == kLetterStateWrongLocation then
                 gfx.setPattern(diagonalPattern)
                 gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
 

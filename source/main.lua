@@ -8,9 +8,6 @@ import "Selection"
 
 local gfx <const> = playdate.graphics
 
-local gameStates <const> = constants.gameStates
-local gameEvents <const> = constants.gameEvents
-
 local word = "hello"
 local displayingModal = false
 
@@ -23,8 +20,8 @@ local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
 local game = Game(word)
 
 -- Perform the initial set up to configure the game board and UI.
-local function setUpSprites(game)
-    selection:moveTo(game:row(), game:position())
+local function setUpSprites()
+    selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
 
     -- Configure how the submit button draws itself.
     function submitButtonSprite:draw(x, y, width, height)
@@ -32,7 +29,7 @@ local function setUpSprites(game)
         gfx.setLineWidth(1)
 
         -- When in entry mode, draw the "unselected" state, i.e. black text on an outline button
-        if game.state == gameStates.kWordEntry then
+        if game.state == kGameStateEnteringWord then
             gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
 
             -- Fill the background in
@@ -44,7 +41,7 @@ local function setUpSprites(game)
             gfx.drawRoundRect(0, 0, self.width, self.height, 15)
 
         -- Otherwise fill the button and draw white text.
-        elseif game.state == gameStates.kWordSubmit then
+        elseif game.state == kGameStateSubmittingWord then
             gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
             gfx.fillRoundRect(0, 0, self.width, self.height, 15)
         end
@@ -98,34 +95,42 @@ local function displayModal(message, durationMs)
     end)
 end
 
-local function registerEvents(game)
-    game.listeners[gameEvents.kStateTransitioned] = function(game, newState)
-        if newState == gameStates.kWordEntry then
-            selection:moveTo(game:row(), game:position())
+-- To avoid having to implement a "latch" system where the check the game state ourselves and ensure
+-- we only react to each change once, we instead have a nice event system where the game will call
+-- our functions in response to various state changes.
+local function registerEvents()
+    game.listeners[kEventGameStateDidTransition] = function(game, newState)
+        -- If we move into submission mode, we want to hide the selection ring and highlight the
+        -- submit button.
+        if newState == kGameStateSubmittingWord then
+            selection:setHidden()
             submitButtonSprite:markDirty()
 
-        elseif newState == gameStates.kWordSubmit then
-            selection:setHidden()
+        -- Otherwise we want to revert those changes.
+        elseif newState == kGameStateEnteringWord then
+            selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             submitButtonSprite:markDirty()
         end
     end
 
-    game.listeners[gameEvents.kWordNotInList] = function(game)
+    -- If the word was not in the list, display a modal informing the player.
+    game.listeners[kEventEnteredWordNotInList] = function(game)
         displayModal("Word not in list.", 2000)
     end
 end
 
-setUpSprites(game)
-registerEvents(game)
+setUpSprites()
+registerEvents()
 
 -- Handles all input based on current game state.
 local function handleInput()
+    -- We do not process input for the game when a modal is displaying.
     if displayingModal then
         return
     end
 
-    -- Input handlers for when the player is entering a word
-    if game.state == gameStates.kWordEntry then
+    -- Input handlers for when the player is entering a word...
+    if game.state == kGameStateEnteringWord then
         local change, acceleratedChange = playdate.getCrankChange()
 
         -- Handle changing letters by cranking if the user has moved the crank.
@@ -144,9 +149,9 @@ local function handleInput()
             playdate.buttonJustPressed(playdate.kButtonLeft)
             or playdate.buttonJustPressed(playdate.kButtonB)
         then
-            if game:position() > 1 then
+            if game:getCurrentPosition() > 1 then
                 game:movePosition(-1)
-                selection:moveTo(game:row(), game:position())
+                selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             end
 
         -- Right/A are used to enter a letter and advance to the next square.
@@ -154,12 +159,12 @@ local function handleInput()
             playdate.buttonJustPressed(playdate.kButtonRight)
             or playdate.buttonJustPressed(playdate.kButtonA)
         then
-            if game:position() < 5 then
+            if game:getCurrentPosition() < 5 then
                 game:movePosition(1)
-                selection:moveTo(game:row(), game:position())
+                selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             else
                 -- If we go right off the edge, move into submit mode.
-                game:transitionTo(gameStates.kWordSubmit)
+                game:transitionTo(kGameStateSubmittingWord)
             end
         end
 
@@ -168,18 +173,18 @@ local function handleInput()
 
     -- In submit mode we are focussed on the submit button. We can only move back out of submit
     -- mode, or confirm our submission.
-    if game.state == gameStates.kWordSubmit then
+    if game.state == kGameStateSubmittingWord then
         if
             playdate.buttonJustPressed(playdate.kButtonLeft)
             or playdate.buttonJustPressed(playdate.kButtonB)
         then
-            game:transitionTo(gameStates.kWordEntry)
+            game:transitionTo(kGameStateEnteringWord)
 
         elseif
             playdate.buttonJustPressed(playdate.kButtonRight)
             or playdate.buttonJustPressed(playdate.kButtonA)
         then
-            game:transitionTo(gameStates.kCheckingEntry)
+            game:transitionTo(kGameStateCheckingEntry)
         end
     end
 end
@@ -187,9 +192,10 @@ end
 function playdate.update()
     -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
     handleInput()
-    game:update()
+
+    -- Update pieces so any animations etc. continue to run.
+    game:updatePieces()
 
     gfx.sprite.update()
     playdate.timer.updateTimers()
-    playdate.drawFPS(380, 225)
 end

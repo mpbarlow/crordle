@@ -1,32 +1,27 @@
-constants = {
-    pieceStates = {
-        kPieceUnchecked = 0,
-        kPieceWrongLocation = 1,
-        kPieceIncorrect = 2,
-        kPieceCorrect = 3
-    },
-    gameStates = {
-        kWordEntry = 0,
-        kWordSubmit = 1,
-        kCheckingEntry = 2,
-        kGameWon = 3,
-        kGameLost = 4
-    },
-    gameEvents = {
-        kStateTransitioned = 0,
-        kWordNotInList = 1,
-        kGameWon = 2,
-        kGameLost = 3
-    },
-    wordStates = {
-        kWordNotInList = 0,
-        kWordIncorrect = 1,
-        kWordCorrect = 2
-    }
-}
+-- Game state constants.
+kLetterStateUnchecked = 0
+kLetterStateWrongLocation = 1
+kLetterStateIncorrect = 2
+kLetterStateCorrect = 3
 
-letters = 5
-guesses = 6
+kGameStateEnteringWord = 0
+kGameStateSubmittingWord = 1
+kGameStateCheckingEntry = 2
+kGameStateGameWon = 3
+kGameStateGameLost = 4
+
+kEventGameStateDidTransition = 0
+kEventEnteredWordNotInList = 1
+kEventGameWon = 2
+kEventGameLost = 3
+
+kWordStateNotInList = 0
+kWordStateIncorrect = 1
+kWordStateCorrect = 2
+
+-- Global attributes.
+letterCount = 5
+guessCount = 6
 
 boardOrigin = {x = 10, y = 17}
 pieceSize = {width = 30, height = 30}

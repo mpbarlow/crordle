@@ -1,8 +1,5 @@
 import "support"
 
-local pieceStates <const> = constants.pieceStates
-local wordStates <const> = constants.wordStates
-
 -- Create a map tracking the frequency of each letter in the provided word.
 local function makeFrequencyMap(word)
     local map = {}
@@ -15,41 +12,34 @@ local function makeFrequencyMap(word)
     return map
 end
 
-function checkEntry(pieces, correctWord, wordList)
+function checkEntry(enteredWord, correctWord, wordList)
     local results = {
         state = nil,
-        pieces = {}
+        letters = {}
     }
-
-    local enteredWord = ""
-
-    -- Get the entered word
-    for position = 1, #pieces do
-        enteredWord = enteredWord .. pieces[position]:getLetter():lower()
-    end
 
     -- Check if the word is in our list.
     if table.indexOfElement(wordList, enteredWord) == nil then
         -- If it's not, we can exit immediately.
-        results.state = wordStates.kWordNotInList
+        results.state = kWordStateNotInList
 
         return results
     end
 
     -- Map how frequently each letter appears in each word. This will allow us to correctly
-    -- implement the "wrong location logic.
+    -- implement the "wrong location" logic.
     local correctWordMap = makeFrequencyMap(correctWord)
     local enteredWordMap = makeFrequencyMap(enteredWord)
 
     -- If the word is valid, check each piece to see which state it should be placed into.
-    for position = 1, #pieces do
-        local targetLetter = correctWord:sub(position, position)
-        local enteredLetter = enteredWord:sub(position, position)
+    for i = 1, letterCount do
+        local targetLetter = correctWord:sub(i, i)
+        local enteredLetter = enteredWord:sub(i, i)
 
         if targetLetter == enteredLetter then
-            results.pieces[position] = pieceStates.kPieceCorrect
+            results.letters[i] = kLetterStateCorrect
 
-        -- A piece should only be marked as in the wrong location if there are still instances of
+        -- A letter should only be marked as in the wrong location if there are still instances of
         -- that letter that have not been identified.
         -- e.g. if correctWord is HELLO and enteredWord is BEEFY, the second E in BEEFY should be
         -- marked incorrect, not wrong location.
@@ -57,18 +47,18 @@ function checkEntry(pieces, correctWord, wordList)
             correctWord:find(enteredLetter) ~= nil
             and enteredWordMap[enteredLetter] <= (correctWordMap[enteredLetter] or 0)
         then
-            results.pieces[position] = pieceStates.kPieceWrongLocation
+            results.letters[i] = kLetterStateWrongLocation
 
         else
-            results.pieces[position] = pieceStates.kPieceIncorrect
+            results.letters[i] = kLetterStateIncorrect
         end
     end
 
     -- Set our overall word state based on whether the whole word matches or not.
     if enteredWord == correctWord then
-        results.state = wordStates.kWordCorrect
+        results.state = kWordStateCorrect
     else
-        results.state = wordStates.kWordIncorrect
+        results.state = kWordStateIncorrect
     end
 
     return results
