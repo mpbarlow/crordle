@@ -1,6 +1,7 @@
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/object"
+import "support"
 
 local gfx <const> = playdate.graphics
 
@@ -48,9 +49,11 @@ function Selection:init(origin, squareSize, squareMargin)
             return
         end
 
-        gfx.setColor(gfx.kColorBlack)
-        gfx.setLineWidth(lineWidth)
-        gfx.drawRect(0, 0, self.width, self.height)
+        inGraphicsContext(function ()
+            gfx.setColor(gfx.kColorBlack)
+            gfx.setLineWidth(lineWidth)
+            gfx.drawRect(0, 0, self.width, self.height)
+        end)
     end
 
     sprite:add()

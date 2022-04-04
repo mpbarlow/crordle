@@ -2,6 +2,7 @@ import "CoreLibs/object"
 import "CoreLibs/graphics"
 import "CoreLibs/animator"
 import "CoreLibs/timer"
+import "support"
 
 local gfx <const> = playdate.graphics
 
@@ -247,107 +248,104 @@ function Piece:init(origin, size)
 
     -- Drawing callback.
     function sprite:draw(x, y, width, height)
-        -- Reset color and drawing modes.
-        gfx.setColor(gfx.kColorBlack)
-        gfx.setImageDrawMode(gfx.kDrawModeCopy)
-        gfx.setLineWidth(1)
+        inGraphicsContext(function ()
+            local yOffset = 0
+            local height = self.height
+            local flipProgress = 0
 
-        local yOffset = 0
-        local height = self.height
-        local flipProgress = 0
+            if flipAnimator ~= nil then
+                flipProgress = flipAnimator:currentValue()
 
-        if flipAnimator ~= nil then
-            flipProgress = flipAnimator:currentValue()
-
-            -- We can simulate flipping by shrinking the height we draw and moving the rectangle
-            -- closer to the center at the same time.
-            -- We animate from -1 to 1 and then abs it to allow us to do a parabolic animation
-            -- using a single animator.
-            yOffset = (self.height / 2) - ((self.height / 2) * math.abs(flipProgress))
-            height = self.height * math.abs(flipProgress)
-        end
-
-        -- Draw the border.
-        gfx.drawRect(0, yOffset, self.width, height)
-
-        -- If the piece is not in play it should not render a letter.
-        if not piece.inPlay then
-            gfx.setDitherPattern(0.5)
-            gfx.fillRect(1, 1, self.width - 2, self.height - 2)
-
-            return
-        end
-
-        -- If we're in the first half of a flip animation, animate to an increasingly darker dither
-        -- to simulate shading.
-        if flipProgress < 0 then
-            gfx.setDitherPattern(math.abs(flipProgress))
-            gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
-
-        -- Otherwise apply shading based on piece state.
-        else
-            -- If the letter is totally incorrect, fill the piece black and draw white text.
-            if pieceState == kLetterStateIncorrect then
-                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
-                gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
-
-            -- If the letter is in the wrong location, draw diagonal lines
-            elseif pieceState == kLetterStateWrongLocation then
-                gfx.setPattern(diagonalPattern)
-                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
-
-                -- Draw a white circle around the letter so we can still see it.
-                gfx.setColor(gfx.kColorWhite)
-                gfx.fillEllipseInRect(4, yOffset + 4, self.width - 8, math.max(0, height - 8))
-
-            -- Otherwise, fill it white
-            else
-                gfx.setColor(gfx.kColorWhite)
-                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
-
+                -- We can simulate flipping by shrinking the height we draw and moving the rectangle
+                -- closer to the center at the same time.
+                -- We animate from -1 to 1 and then abs it to allow us to do a parabolic animation
+                -- using a single animator.
+                yOffset = (self.height / 2) - ((self.height / 2) * math.abs(flipProgress))
+                height = self.height * math.abs(flipProgress)
             end
-        end
 
-        -- If we're animating a flip we don't want to draw the letter as we'll see it through the
-        -- animation.
-        if flipAnimator ~= nil then
-            return
-        end
+            -- Draw the border.
+            gfx.setColor(gfx.kColorBlack)
+            gfx.drawRect(0, yOffset, self.width, height)
 
-        -- To keep the draw logic simple, we always draw the current, previous, and next letter,
-        -- taking advantage of sprite clipping to only show what should be visible.
-        local prevLetter = "*" .. letters[previousRenderIndex()] .. "*"
-        local currentLetter = "*" .. letters[currentRenderIndex()] .. "*"
-        local nextLetter = "*" .. letters[nextRenderIndex()] .. "*"
+            -- If the piece is not in play it should not render a letter.
+            if not piece.inPlay then
+                gfx.setDitherPattern(0.5)
+                gfx.fillRect(1, 1, self.width - 2, self.height - 2)
 
-        local prevWidth = gfx.getTextSize(prevLetter)
-        local currentWidth = gfx.getTextSize(currentLetter)
-        local nextWidth = gfx.getTextSize(nextLetter)
+                return
+            end
 
-        -- getTextSize reports back a height of 20px which doesn't seem to be right...
-        local letterHeight = 16
+            -- If we're in the first half of a flip animation, animate to an increasingly darker
+            -- dither to simulate shading.
+            if flipProgress < 0 then
+                gfx.setDitherPattern(math.abs(flipProgress))
+                gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
 
-        -- The relative scroll offset within the height of the piece.
-        local relativeOffset = offset % self.height
+            -- Otherwise apply shading based on piece state.
+            else
+                -- If the letter is totally incorrect, fill the piece black and draw white text.
+                if pieceState == kLetterStateIncorrect then
+                    gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
+                    gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
 
-        -- Draw the previous, current, and next letters one piece height apart.
-        gfx.drawText(
-            prevLetter,
-            (self.width / 2) - (prevWidth / 2),
-            (self.height / 2) - (letterHeight / 2) - relativeOffset - self.height
-        )
+                -- If the letter is in the wrong location, draw diagonal lines
+                elseif pieceState == kLetterStateWrongLocation then
+                    gfx.setPattern(diagonalPattern)
+                    gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
 
-        gfx.drawText(
-            currentLetter,
-            (self.width / 2) - (currentWidth / 2),
-            (self.height / 2) - (letterHeight / 2) - relativeOffset
-        )
+                    -- Draw a white circle around the letter so we can still see it.
+                    gfx.setColor(gfx.kColorWhite)
+                    gfx.fillEllipseInRect(4, yOffset + 4, self.width - 8, math.max(0, height - 8))
 
-        gfx.drawText(
-            nextLetter,
-            (self.width / 2) - (nextWidth / 2),
-            (self.height / 2) - (letterHeight / 2) - relativeOffset + self.height
-        )
+                -- Otherwise, fill it white
+                else
+                    gfx.setColor(gfx.kColorWhite)
+                    gfx.fillRect(1, yOffset + 1, self.width - 2, height - 2)
+                end
+            end
+
+            -- If we're animating a flip we don't want to draw the letter as we'll see it through
+            -- the animation.
+            if flipAnimator ~= nil then
+                return
+            end
+
+            -- To keep the draw logic simple, we always draw the current, previous, and next letter,
+            -- taking advantage of sprite clipping to only show what should be visible.
+            local prevLetter = "*" .. letters[previousRenderIndex()] .. "*"
+            local currentLetter = "*" .. letters[currentRenderIndex()] .. "*"
+            local nextLetter = "*" .. letters[nextRenderIndex()] .. "*"
+
+            local prevWidth = gfx.getTextSize(prevLetter)
+            local currentWidth = gfx.getTextSize(currentLetter)
+            local nextWidth = gfx.getTextSize(nextLetter)
+
+            -- getTextSize reports back a height of 20px which doesn't seem to be right...
+            local letterHeight = 16
+
+            -- The relative scroll offset within the height of the piece.
+            local relativeOffset = offset % self.height
+
+            -- Draw the previous, current, and next letters one piece height apart.
+            gfx.drawText(
+                prevLetter,
+                (self.width / 2) - (prevWidth / 2),
+                (self.height / 2) - (letterHeight / 2) - relativeOffset - self.height
+            )
+
+            gfx.drawText(
+                currentLetter,
+                (self.width / 2) - (currentWidth / 2),
+                (self.height / 2) - (letterHeight / 2) - relativeOffset
+            )
+
+            gfx.drawText(
+                nextLetter,
+                (self.width / 2) - (nextWidth / 2),
+                (self.height / 2) - (letterHeight / 2) - relativeOffset + self.height
+            )
+        end)
     end
 
     sprite:setBounds(origin.x, origin.y, size.width, size.height)

@@ -2,6 +2,10 @@
 --
 -- Provides game enum constants, global "knobs and dials", and helper functions.
 
+import "CoreLibs/graphics"
+
+local gfx <const> = playdate.graphics
+
 -- Game state constants.
 kLetterStateUnchecked = 0
 kLetterStateWrongLocation = 1
@@ -25,7 +29,7 @@ kWordStateCorrect = 2
 
 -- Global attributes
 letterCount = 5
-guessCount = 3
+guessCount = 6
 
 -- The top left co-ordinate of the board
 boardOrigin = {x = 10, y = 17}
@@ -38,4 +42,11 @@ pieceMargin = 5
 
 function randomWord(words)
     return words[math.random(1, #words)]
+end
+
+-- Run the provided callback inside its own graphics context.
+function inGraphicsContext(callback)
+    gfx.pushContext()
+    callback()
+    gfx.popContext()
 end

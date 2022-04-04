@@ -60,7 +60,7 @@ local function registerEvents()
     end
 
     game.listeners[kEventGameLost] = function()
-        modal:displayMessageForDuration("Bad luck! The word was \"" .. word .. "\".", 20000)
+        modal:displayMessageForDuration("Bad luck! The word was \"" .. word .. "\".", 2000)
     end
 end
 
