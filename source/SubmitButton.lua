@@ -41,13 +41,17 @@ function SubmitButton:init()
                 gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
             end
 
-            local textCenterY = (self.height / 2) - 8
+            local font <const> = fonts.regular
+            gfx.setFont(font)
+
+            -- Just looks visually off without the + 1
+            local textCenterY = ((self.height - font:getHeight()) / 2) + 1
 
             if isHighlighted then
                 textCenterY += 2
             end
 
-            gfx.drawTextAligned("*Submit*", self.width / 2, textCenterY, kTextAlignment.center)
+            gfx.drawTextAligned("Submit", self.width / 2, textCenterY, kTextAlignment.center)
         end)
     end
 

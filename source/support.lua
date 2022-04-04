@@ -15,13 +15,14 @@ kLetterStateCorrect = 3
 kGameStateEnteringWord = 0
 kGameStateSubmittingWord = 1
 kGameStateCheckingEntry = 2
-kGameStateGameWon = 3
-kGameStateGameLost = 4
+kGameStateWon = 3
+kGameStateLost = 4
+
+kUIStatePlayingGame = 0
+kUIStateDisplayingModal = 1
 
 kEventGameStateDidTransition = 0
 kEventEnteredWordNotInList = 1
-kEventGameWon = 2
-kEventGameLost = 3
 
 kWordStateNotInList = 0
 kWordStateIncorrect = 1
@@ -39,6 +40,11 @@ pieceSize = {width = 30, height = 30}
 
 -- Space between each piece vertically and horizontally in pixels
 pieceMargin = 5
+
+fonts = {
+    small = gfx.font.new("fonts/Roobert-10-Bold"),
+    regular = gfx.font.new("fonts/Roobert-11-Medium"),
+}
 
 function randomWord(words)
     return words[math.random(1, #words)]

@@ -32,8 +32,7 @@ class('Game', {
     -- Set default event listeners so we don't have to check if they're defined before firing them.
     listeners = {
         [kEventGameStateDidTransition] = function () end,
-        [kEventGameWon] = function () end,
-        [kEventGameLost] = function () end,
+        [kEventEnteredWordNotInList] = function () end,
     },
     -- We begin the game entering a word.
     state = kGameStateEnteringWord
@@ -81,7 +80,6 @@ function Game:init(word)
                 function ()
                     -- If the word was correct, the player won.
                     if wordCheckResults.state == kWordStateCorrect then
-                        self.listeners[kEventGameWon](self)
                         self:transitionTo(kGameStateWon)
 
                         return
@@ -89,7 +87,6 @@ function Game:init(word)
 
                     -- If it wasn't correct and the player used all their guesses, they lost.
                     if currentRow == guessCount then
-                        self.listeners[kEventGameLost](self)
                         self:transitionTo(kGameStateLost)
 
                         return

@@ -9,7 +9,11 @@ import "SubmitButton"
 import "Modal"
 
 local gfx <const> = playdate.graphics
-local word = "hello"
+
+-- An 8x8 pattern that has a white background with a single block dot (approximate) in the center.
+local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
+
+local word = "aaaab"
 
 -- Helper object to handle drawing a sprite around the active piece to show a selected state.
 local selection = Selection(boardOrigin, pieceSize, pieceMargin)
@@ -19,8 +23,7 @@ local modal = Modal()
 -- Tracks the state for the current game.
 local game = Game(word)
 
--- An 8x8 pattern that has a white background with a single block dot (approximate) in the center.
-local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
+local uiState = kUIStatePlayingGame
 
 -- Perform the initial set up to configure the game board and UI.
 selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
@@ -47,25 +50,39 @@ local function registerEvents()
         elseif newState == kGameStateEnteringWord then
             selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             submitButton:setHighlighted(false)
+
+        elseif newState == kGameStateWon then
+            uiState = kUIStateDisplayingModal
+            modal:displayMessage("Splendid!", "New game")
+
+        elseif newState == kGameStateLost then
+            uiState = kUIStateDisplayingModal
+            modal:displayMessage("Bad luck! The word was \"" .. word .. "\".", "Try again")
         end
     end
 
     -- If the word was not in the list, display a modal informing the player.
     game.listeners[kEventEnteredWordNotInList] = function()
-        modal:displayMessageForDuration("I don't know that word.", 2000)
-    end
-
-    game.listeners[kEventGameWon] = function()
-        modal:displayMessageForDuration("Splendid!", 2000)
-    end
-
-    game.listeners[kEventGameLost] = function()
-        modal:displayMessageForDuration("Bad luck! The word was \"" .. word .. "\".", 2000)
+        uiState = kUIStateDisplayingModal
+        modal:displayMessage("I don't know that word.")
     end
 end
 
 -- Handles all input based on current game state.
 local function handleInput()
+    -- If we're displaying a modal, direct into into that instead of the game.
+    if uiState == kUIStateDisplayingModal then
+        if
+            playdate.buttonJustPressed(playdate.kButtonA)
+            or playdate.buttonJustPressed(playdate.kButtonRight)
+        then
+            modal:dismiss()
+            uiState = kUIStatePlayingGame
+        end
+
+        return
+    end
+
     -- Input handlers for when the player is entering a word...
     if game.state == kGameStateEnteringWord then
         local change, acceleratedChange = playdate.getCrankChange()
@@ -129,11 +146,8 @@ end
 registerEvents()
 
 function playdate.update()
-    -- We do not process input for the game when a modal is displaying.
-    if not modal:isDisplaying() then
-        -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
-        handleInput()
-    end
+    -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
+    handleInput()
 
     -- Update pieces so any animations etc. continue to run.
     game:updatePieces()
