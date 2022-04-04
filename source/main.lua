@@ -5,97 +5,34 @@ import "CoreLibs/timer"
 import "support"
 import "Game"
 import "Selection"
+import "SubmitButton"
+import "Modal"
 
 local gfx <const> = playdate.graphics
-
 local word = "hello"
-local displayingModal = false
 
-local submitButtonBounds <const> = playdate.geometry.rect.new(215, 100, 150, 40)
-local submitButtonSprite <const> = gfx.sprite.new()
+-- Helper object to handle drawing a sprite around the active piece to show a selected state.
 local selection = Selection(boardOrigin, pieceSize, pieceMargin)
+local submitButton = SubmitButton()
+local modal = Modal()
 
-local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
-
+-- Tracks the state for the current game.
 local game = Game(word)
 
+-- An 8x8 pattern that has a white background with a single block dot (approximate) in the center.
+local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
+
 -- Perform the initial set up to configure the game board and UI.
-local function setUpSprites()
-    selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
+selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
 
-    -- Configure how the submit button draws itself.
-    function submitButtonSprite:draw(x, y, width, height)
-        gfx.setColor(gfx.kColorBlack)
-        gfx.setLineWidth(1)
+gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
+    gfx.setClipRect(x, y, width, height)
+    gfx.setPattern(dotPattern)
+    gfx.fillRect(x, y, width, height)
+    gfx.clearClipRect()
+end)
 
-        -- When in entry mode, draw the "unselected" state, i.e. black text on an outline button
-        if game.state == kGameStateEnteringWord then
-            gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
-
-            -- Fill the background in
-            gfx.setColor(gfx.kColorWhite)
-            gfx.fillRoundRect(0, 0, self.width, self.height, 15)
-
-            -- Draw outline
-            gfx.setColor(gfx.kColorBlack)
-            gfx.drawRoundRect(0, 0, self.width, self.height, 15)
-
-        -- Otherwise fill the button and draw white text.
-        elseif game.state == kGameStateSubmittingWord then
-            gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
-            gfx.fillRoundRect(0, 0, self.width, self.height, 15)
-        end
-
-        gfx.drawTextAligned(
-            "*Submit*",
-            self.width / 2,
-            (self.height / 2) - 8,
-            kTextAlignment.center
-        )
-    end
-
-    submitButtonSprite:setBounds(submitButtonBounds)
-    submitButtonSprite:add()
-
-    gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
-        gfx.setClipRect(x, y, width, height)
-        gfx.setPattern(dotPattern)
-        gfx.fillRect(x, y, width, height)
-        gfx.clearClipRect()
-    end)
-end
-
-local function displayModal(message, durationMs)
-    if displayingModal then
-        return
-    end
-
-    displayingModal = true
-
-    local sprite = gfx.sprite.new()
-
-    function sprite:draw(x, y, width, height)
-        gfx.setColor(gfx.kColorWhite)
-        gfx.fillRoundRect(0, 0, self.width, self.height, 10)
-
-        gfx.setColor(gfx.kColorBlack)
-        gfx.drawRoundRect(0, 0, self.width, self.height, 10)
-
-        gfx.drawTextAligned(message, self.width / 2, (self.height / 2) - 8, kTextAlignment.center)
-    end
-
-    sprite:setBounds(50, 70, 300, 100)
-    sprite:setZIndex(10)
-
-    sprite:add()
-
-    playdate.timer.performAfterDelay(durationMs, function ()
-        sprite:remove()
-        displayingModal = false
-    end)
-end
-
--- To avoid having to implement a "latch" system where the check the game state ourselves and ensure
+-- To avoid having to implement a latch system where we check the game state each update and ensure
 -- we only react to each change once, we instead have a nice event system where the game will call
 -- our functions in response to various state changes.
 local function registerEvents()
@@ -103,32 +40,32 @@ local function registerEvents()
         -- If we move into submission mode, we want to hide the selection ring and highlight the
         -- submit button.
         if newState == kGameStateSubmittingWord then
-            selection:setHidden()
-            submitButtonSprite:markDirty()
+            selection:hide()
+            submitButton:setHighlighted()
 
         -- Otherwise we want to revert those changes.
         elseif newState == kGameStateEnteringWord then
             selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
-            submitButtonSprite:markDirty()
+            submitButton:setHighlighted(false)
         end
     end
 
     -- If the word was not in the list, display a modal informing the player.
-    game.listeners[kEventEnteredWordNotInList] = function(game)
-        displayModal("Word not in list.", 2000)
+    game.listeners[kEventEnteredWordNotInList] = function()
+        modal:displayMessageForDuration("I don't know that word.", 2000)
+    end
+
+    game.listeners[kEventGameWon] = function()
+        modal:displayMessageForDuration("Splendid!", 2000)
+    end
+
+    game.listeners[kEventGameLost] = function()
+        modal:displayMessageForDuration("Bad luck! The word was \"" .. word .. "\".", 20000)
     end
 end
 
-setUpSprites()
-registerEvents()
-
 -- Handles all input based on current game state.
 local function handleInput()
-    -- We do not process input for the game when a modal is displaying.
-    if displayingModal then
-        return
-    end
-
     -- Input handlers for when the player is entering a word...
     if game.state == kGameStateEnteringWord then
         local change, acceleratedChange = playdate.getCrankChange()
@@ -189,9 +126,14 @@ local function handleInput()
     end
 end
 
+registerEvents()
+
 function playdate.update()
-    -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
-    handleInput()
+    -- We do not process input for the game when a modal is displaying.
+    if not modal:isDisplaying() then
+        -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
+        handleInput()
+    end
 
     -- Update pieces so any animations etc. continue to run.
     game:updatePieces()

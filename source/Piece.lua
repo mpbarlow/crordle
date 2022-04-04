@@ -22,9 +22,17 @@ local diagonalPattern <const> = {
     tonumber("11110111", 2),
 }
 
+-- How many letters a complete crank should scroll by. Note that this is more of a generic
+-- multiplier than a hard value, as we use the accelerated change when handling cranking.
 local lettersPerCrank <const> = 3
+
+-- Duration in ms of the flip animation when revealing letter results.
+local flipDuration <const> = 400
+
+-- Duration in ms of the animation of a letter snapping into place.
 local snapDuration <const> = 250
-local flipDuration <const> = 500
+
+-- Timeout in ms after cranking stops before a letter snaps into place.
 local snapTimeout <const> = 1000
 
 -- Piece encapsulates a single letter selection.

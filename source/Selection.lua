@@ -1,3 +1,5 @@
+import "CoreLibs/graphics"
+import "CoreLibs/sprites"
 import "CoreLibs/object"
 
 local gfx <const> = playdate.graphics
@@ -11,10 +13,10 @@ function Selection:init(origin, squareSize, squareMargin)
     Selection.super.init(self)
 
     local sprite = gfx.sprite.new()
-    local hidden = false
+    local isHidden = false
 
     local function moveTo(self, row, position)
-        hidden = false
+        isHidden = false
 
         local x = ((position - 1) * squareSize.width)
             + ((position - 1) * squareMargin)
@@ -36,13 +38,13 @@ function Selection:init(origin, squareSize, squareMargin)
         sprite:markDirty()
     end
 
-    local function setHidden(self)
-        hidden = true
+    local function hide(self)
+        isHidden = true
         sprite:markDirty()
     end
 
     function sprite:draw(x, y, width, height)
-        if hidden then
+        if isHidden then
             return
         end
 
@@ -54,5 +56,5 @@ function Selection:init(origin, squareSize, squareMargin)
     sprite:add()
 
     self.moveTo = moveTo
-    self.setHidden = setHidden
+    self.hide = hide
 end

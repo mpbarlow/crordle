@@ -1,3 +1,7 @@
+-- support.lua
+--
+-- Provides game enum constants, global "knobs and dials", and helper functions.
+
 -- Game state constants.
 kLetterStateUnchecked = 0
 kLetterStateWrongLocation = 1
@@ -19,12 +23,17 @@ kWordStateNotInList = 0
 kWordStateIncorrect = 1
 kWordStateCorrect = 2
 
--- Global attributes.
+-- Global attributes
 letterCount = 5
-guessCount = 6
+guessCount = 3
 
+-- The top left co-ordinate of the board
 boardOrigin = {x = 10, y = 17}
+
+-- Size of each piece in pixels
 pieceSize = {width = 30, height = 30}
+
+-- Space between each piece vertically and horizontally in pixels
 pieceMargin = 5
 
 function randomWord(words)

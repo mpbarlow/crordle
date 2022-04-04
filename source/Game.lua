@@ -8,7 +8,7 @@ local gfx <const> = playdate.graphics
 local wordList <const> = import "words"
 
 -- The number of milliseconds to wait between checking each letter when submitting a word.
-local checkDuration <const> = 500
+local checkDuration <const> = 400
 
 -- Build the board as a letterCount x guessCount grid of Pieces.
 local function createBoard()
@@ -40,6 +40,8 @@ class('Game', {
 }).extends()
 
 function Game:init(word)
+    Game.super.init(self)
+
     local board <const> = createBoard()
 
     local currentRow = 1
