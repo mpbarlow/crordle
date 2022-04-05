@@ -53,7 +53,7 @@ function Piece:init(origin, size)
     local piece = self
 
     -- Track the current play state of our piece. Each piece starts unchecked.
-    local pieceState = kLetterStateUnchecked
+    local pieceState = nil
 
     -- Store the letter index. This is the source of truth for what letter is actually selected in
     -- the piece.
@@ -246,6 +246,10 @@ function Piece:init(origin, size)
         end
     end
 
+    local function tearDown()
+        sprite:remove()
+    end
+
     -- Drawing callback.
     function sprite:draw(x, y, width, height)
         inGraphicsContext(function ()
@@ -358,4 +362,5 @@ function Piece:init(origin, size)
     self.setLetter = setLetter
     self.setPieceState = setPieceState
     self.update = update
+    self.tearDown = tearDown
 end

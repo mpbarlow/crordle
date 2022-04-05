@@ -1,11 +1,9 @@
 import "CoreLibs/object"
 import "support"
-import "Piece"
 import "checkEntry"
+import "Piece"
 
 local gfx <const> = playdate.graphics
-
-local wordList <const> = import "words"
 
 -- The number of milliseconds to wait between checking each letter when submitting a word.
 local checkDuration <const> = 400
@@ -38,8 +36,11 @@ class('Game', {
     state = kGameStateEnteringWord
 }).extends()
 
-function Game:init(word)
+function Game:init(wordList)
     Game.super.init(self)
+
+    -- TODO: Why doesn't this work as an instance method?
+    self.word = table.randomElement(wordList)
 
     local board <const> = createBoard()
 
@@ -123,7 +124,7 @@ function Game:init(word)
         -- If we've moved into the entry check state, check the input and update the game and piece
         -- state accordingly.
         if newState == kGameStateCheckingEntry then
-            handleEntryCheck(checkEntry(getEnteredWord(), word, wordList))
+            handleEntryCheck(checkEntry(getEnteredWord(), self.word, wordList))
         end
     end
 
@@ -163,6 +164,14 @@ function Game:init(word)
         end
     end
 
+    local function tearDown()
+        for row = 1, guessCount do
+            for position = 1, letterCount do
+                board[row][position]:tearDown()
+            end
+        end
+    end
+
     self.getCurrentRow = getCurrentRow
     self.getCurrentPosition = getCurrentPosition
     self.transitionTo = transitionTo
@@ -170,4 +179,5 @@ function Game:init(word)
     self.moveLetter = moveLetter
     self.movePosition = movePosition
     self.updatePieces = updatePieces
+    self.tearDown = tearDown
 end

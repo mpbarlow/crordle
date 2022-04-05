@@ -1,15 +1,38 @@
 import "support"
 
--- Create a map tracking the frequency of each letter in the provided word.
-local function makeFrequencyMap(word)
-    local map = {}
-
-    for l = 1, #word do
-        local letter = word:sub(l, l)
-        map[letter] = (map[letter] or 0) + 1
+-- Mark letter positions as correct if the letter at that position matches the letter at that
+-- position of the correct word.
+local function markCorrectLetters(map, enteredWord, correctWord)
+    for i = 1, #enteredWord do
+        if enteredWord:sub(i, i) == correctWord:sub(i, i) then
+            map[i] = kLetterStateCorrect
+        end
     end
+end
 
-    return map
+-- Mark letter positions as wrong location if the letter at that position is present in the letters
+-- of the correct word in positions that have not yet been classified.
+local function markWrongLocationLetters(map, enteredWord, correctWord)
+    for i = 1, #enteredWord do
+        if map[i] == nil then
+            local remainingLetters <const> = correctWord:filter(function (_, index)
+                return map[index] == nil
+            end)
+
+            if remainingLetters:find(enteredWord:sub(i, i)) ~= nil then
+                map[i] = kLetterStateWrongLocation
+            end
+        end
+    end
+end
+
+-- Finally, anything left unmarked must be incorrect
+local function markIncorrectLetters(map, enteredWord, correctWord)
+    for i = 1, #enteredWord do
+        if map[i] == nil then
+            map[i] = kLetterStateIncorrect
+        end
+    end
 end
 
 function checkEntry(enteredWord, correctWord, wordList)
@@ -26,33 +49,18 @@ function checkEntry(enteredWord, correctWord, wordList)
         return results
     end
 
-    -- Map how frequently each letter appears in each word. This will allow us to correctly
-    -- implement the "wrong location" logic.
-    local correctWordMap = makeFrequencyMap(correctWord)
-    local enteredWordMap = makeFrequencyMap(enteredWord)
+    -- We run three passes on the entered word...
 
-    -- If the word is valid, check each piece to see which state it should be placed into.
-    for i = 1, letterCount do
-        local targetLetter = correctWord:sub(i, i)
-        local enteredLetter = enteredWord:sub(i, i)
+    -- The first marks all letters that are in the correct place.
+    markCorrectLetters(results.letters, enteredWord, correctWord)
 
-        if targetLetter == enteredLetter then
-            results.letters[i] = kLetterStateCorrect
+    -- The second marks all letters that exist in correctWord, but that are not in the right place.
+    -- This is a rolling process, so if we have two As in the wrong place but only one A in the
+    -- correct word, the second A will be marked as incorrect as to not mislead the player.
+    markWrongLocationLetters(results.letters, enteredWord, correctWord)
 
-        -- A letter should only be marked as in the wrong location if there are still instances of
-        -- that letter that have not been identified.
-        -- e.g. if correctWord is HELLO and enteredWord is BEEFY, the second E in BEEFY should be
-        -- marked incorrect, not wrong location.
-        elseif
-            correctWord:find(enteredLetter) ~= nil
-            and enteredWordMap[enteredLetter] <= (correctWordMap[enteredLetter] or 0)
-        then
-            results.letters[i] = kLetterStateWrongLocation
-
-        else
-            results.letters[i] = kLetterStateIncorrect
-        end
-    end
+    -- Finally, any letters which have not yet been checked must be incorrect.
+    markIncorrectLetters(results.letters, enteredWord, correctWord)
 
     -- Set our overall word state based on whether the whole word matches or not.
     if enteredWord == correctWord then
