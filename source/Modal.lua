@@ -4,7 +4,7 @@ import "CoreLibs/object"
 import "support"
 
 local gfx <const> = playdate.graphics
-local bounds <const> = playdate.geometry.rect.new(50, 70, 300, 100)
+local bounds <const> = playdate.geometry.rect.new(35, 70, 330, 100)
 
 local smallFontHeight <const> = fonts.small:getHeight()
 local regularFontHeight <const> = fonts.regular:getHeight()
@@ -20,11 +20,20 @@ function Modal:init()
 
     -- Message to display in the modal. If this is nil, the modal does not draw.
     local message = nil
+    local lines = 1
     local buttonText = nil
 
     local function displayMessage(self, newMessage, newButtonText)
         message = newMessage
         buttonText = newButtonText
+
+        -- Count the number of lines in the message so we can correctly offset where we draw it.
+        lines = 1
+
+        for _ in message:gmatch("\n") do
+            lines += 1
+        end
+
         sprite:markDirty()
     end
 
@@ -58,7 +67,7 @@ function Modal:init()
             gfx.drawTextAligned(
                 message,
                 self.width / 2,
-                (self.height - regularFontHeight) / 2,
+                (self.height / 2) - ((regularFontHeight * lines) / 2),
                 kTextAlignment.center
             )
 

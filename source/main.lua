@@ -22,6 +22,25 @@ local wordList <const> = import "words"
 -- dismissing a modal.
 local uiState = kUIStatePlayingGame
 
+-- Retrieve the stored game stats (or create them if they don't exist yet).
+local userData <const> = playdate.datastore.read() or {
+    startFromA = false,
+    gameStats = {played = 0, won = 0, streak = 0}
+}
+
+local systemMenu <const> = playdate.getSystemMenu()
+
+-- Add an option to the menu allowing the user to have every piece start at "A", rather than the
+-- previous letter.
+systemMenu:addCheckmarkMenuItem(
+    "start on \"a\"",
+    userData.startFromA,
+    function(newValue)
+        userData.startFromA = newValue
+        playdate.datastore.write(userData)
+    end
+)
+
 -- Objects for UI elements in-game
 local selection <const> = Selection(boardOrigin, pieceSize, pieceMargin)
 local submitButton <const> = SubmitButton()
@@ -57,6 +76,23 @@ gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
     gfx.clearClipRect()
 end)
 
+-- Update the player's streak stats and write them back to the save file.
+local function updateGameStats(gameWon)
+    local gameStats <const> = userData.gameStats
+
+    gameStats.played += 1
+
+    if gameWon then
+        gameStats.won += 1
+        gameStats.streak += 1
+    else
+        gameStats.streak = 0
+    end
+
+    userData.gameStats = gameStats
+    playdate.datastore.write(userData)
+end
+
 -- To avoid having to implement a system where we check the game state each update and ensure we
 -- only react to each change once, we instead have a nice event system where the game will call
 -- our functions in response to various state changes.
@@ -73,13 +109,29 @@ local function registerEventHandlers()
             selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             submitButton:setHighlighted(false)
 
+        -- If the player has won or lost, we want to update the game stats and display either a
+        -- congratulatory or condolence message.
         elseif newState == kGameStateWon then
+            updateGameStats(true)
+
             uiState = kUIStateDisplayingModal
-            modal:displayMessage("Splendid!", "New game")
+            modal:displayMessage(
+                "Splendid!\n" .. getGameStatsDescription(userData.gameStats),
+                "New game"
+            )
 
         elseif newState == kGameStateLost then
+            updateGameStats(false)
+
             uiState = kUIStateDisplayingModal
-            modal:displayMessage("Bad luck! The word was \"" .. game.word .. "\".", "Try again")
+            modal:displayMessage(
+                "Bad luck! The word was \""
+                    .. game.word
+                    .. "\".\n"
+                    .. getGameStatsDescription(userData.gameStats),
+                "Try again"
+            )
+
         end
     end)
 
@@ -99,7 +151,7 @@ local function resetGame()
     end
 
     -- Create a new game, casting any old game unto ye cruel garbage collector
-    game = Game(wordList)
+    game = Game(wordList, userData)
     registerEventHandlers()
 
     -- Reset UI

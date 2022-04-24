@@ -56,3 +56,18 @@ end
 function table.randomElement(t)
     return t[math.random(1, #t)]
 end
+
+-- Returns a string breaking down the stats in the provided table.
+function getGameStatsDescription(statsTable)
+    local winPercentage <const> = math.floor((statsTable.won / statsTable.played) * 100)
+
+    return "Won "
+        .. statsTable.won
+        .. "/"
+        .. statsTable.played
+        .. " ("
+        .. winPercentage
+        .. "%), streak "
+        .. statsTable.streak
+        .. "."
+end

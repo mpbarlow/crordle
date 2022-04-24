@@ -31,10 +31,14 @@ class('Game', {
     state = kGameStateEnteringWord
 }).extends()
 
-function Game:init(wordList)
+function Game:init(wordList, userData)
     Game.super.init(self)
 
     self.word = table.randomElement(wordList)
+
+    if playdate.isSimulator then
+        print(self.word)
+    end
 
     -- Set default event handlers so we don't have to check if they're defined before firing them.
     local eventHandlers = {
@@ -152,9 +156,14 @@ function Game:init(wordList)
             or position <= currentPosition
 
         -- When first adding a piece to play, set its initial letter to the last selected letter,
-        -- rather than making the player go from "A" every time.
-        -- TODO: Make this a game setting.
-        if position > 1 and not board[row][position].inPlay and pieceShouldBeInPlay then
+        -- rather than making the player go from "A" every time -- unless they would prefer to and
+        -- have changed the setting.
+        if
+            not userData.startFromA
+            and position > 1
+            and not board[row][position].inPlay
+            and pieceShouldBeInPlay
+        then
             board[row][position]:setLetter(board[row][position - 1]:getLetter())
         end
 
