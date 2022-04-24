@@ -16,6 +16,9 @@ local logo <const> = playdate.graphics.image.new("images/Crordle logo")
 
 -- An 8x8 pattern that has a white background with a single block dot (approximately) in the center
 local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
+
+-- Import the list of answers and the list of valid words.
+local solutionList <const> = import "solutions"
 local wordList <const> = import "words"
 
 -- UI state determines where we direct our inputs, e.g. into the game or into "UI-y" stuff like
@@ -151,7 +154,7 @@ local function resetGame()
     end
 
     -- Create a new game, casting any old game unto ye cruel garbage collector
-    game = Game(wordList, userData)
+    game = Game(solutionList, wordList, userData)
     registerEventHandlers()
 
     -- Reset UI

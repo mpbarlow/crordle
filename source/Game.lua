@@ -31,10 +31,10 @@ class('Game', {
     state = kGameStateEnteringWord
 }).extends()
 
-function Game:init(wordList, userData)
+function Game:init(solutionList, wordList, userData)
     Game.super.init(self)
 
-    self.word = table.randomElement(wordList)
+    self.word = table.randomElement(solutionList)
 
     if playdate.isSimulator then
         print(self.word)
