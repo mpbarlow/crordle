@@ -1,3 +1,6 @@
+-- main.lua
+-- Contains the initialisation code and the core game loop with input handling.
+
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/timer"
@@ -31,29 +34,32 @@ local userData <const> = playdate.datastore.read() or {
     gameStats = {played = 0, won = 0, streak = 0}
 }
 
-local systemMenu <const> = playdate.getSystemMenu()
-
--- Add an option to the menu allowing the user to have every piece start at "A", rather than the
+-- Add an option to the menu allowing the player to have every piece start at "A", rather than the
 -- previous letter.
-systemMenu:addCheckmarkMenuItem(
+playdate.getSystemMenu():addCheckmarkMenuItem(
     "start on \"a\"",
     userData.startFromA,
-    function(newValue)
+    function (newValue)
         userData.startFromA = newValue
         playdate.datastore.write(userData)
     end
 )
 
--- Objects for UI elements in-game
+-- Objects for UI elements in-game:
+-- Selection draws a ring around the active piece
 local selection <const> = Selection(boardOrigin, pieceSize, pieceMargin)
+
+-- Submit button draws the sprite for submitting a word entry.
 local submitButton <const> = SubmitButton()
+
+-- Modal assists with displaying pop-up, focus-stealing messages to the player.
 local modal <const> = Modal()
 
--- Tracks the state for the current game.
+-- Holds our current game object. Instantiated in resetGame().
 local game
 
--- Draw our background pattern and the Crordle logo
-gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
+-- Draw our static UI elements
+gfx.sprite.setBackgroundDrawingCallback(function (x, y, width, height)
     gfx.setClipRect(x, y, width, height)
 
     doInGraphicsContext(function ()
@@ -92,7 +98,6 @@ local function updateGameStats(gameWon)
         gameStats.streak = 0
     end
 
-    userData.gameStats = gameStats
     playdate.datastore.write(userData)
 end
 
@@ -100,14 +105,14 @@ end
 -- only react to each change once, we instead have a nice event system where the game will call
 -- our functions in response to various state changes.
 local function registerEventHandlers()
-    game:registerEventHandler(kEventGameStateDidTransition, function(game, newState)
+    game:registerEventHandler(kEventGameStateDidTransition, function (game, newState)
         -- If we move into submission mode, we want to hide the selection ring and highlight the
         -- submit button.
         if newState == kGameStateSubmittingWord then
             selection:hide()
             submitButton:setHighlighted()
 
-        -- Otherwise we want to revert those changes.
+        -- Otherwise we want to do the opposite.
         elseif newState == kGameStateEnteringWord then
             selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             submitButton:setHighlighted(false)
@@ -139,13 +144,13 @@ local function registerEventHandlers()
     end)
 
     -- If the word was not in the list, display a modal informing the player.
-    game:registerEventHandler(kEventEnteredWordNotInList, function()
+    game:registerEventHandler(kEventEnteredWordNotInList, function ()
         uiState = kUIStateDisplayingModal
         modal:displayMessage("That's not in the word list!")
     end)
 end
 
--- Start a new game
+-- Start a new game.
 local function resetGame()
     -- Before we kill the old game we need to remove all the piece sprites from the display list
     -- so they don't keep drawing underneath our new sprites.
@@ -153,18 +158,19 @@ local function resetGame()
         game:tearDown()
     end
 
-    -- Create a new game, casting any old game unto ye cruel garbage collector
+    -- Create a new game, casting the old game unto ye cruel garbage collector
     game = Game(solutionList, wordList, userData)
     registerEventHandlers()
 
-    -- Reset UI
+    -- Reset the UI
     selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
     submitButton:setHighlighted(false)
 end
 
--- Handles all input based on current game state.
+-- Handles all input based on current game and UI state.
 local function handleInput()
-    -- If we're displaying a modal, direct into into that instead of the game.
+    -- If we're displaying a modal, direct input into that instead of the game. We can press A or
+    -- right to dismiss the modal and move back to the "playing game" state.
     if uiState == kUIStateDisplayingModal then
         if
             playdate.buttonJustPressed(playdate.kButtonA)
@@ -182,11 +188,10 @@ local function handleInput()
         return
     end
 
-    -- Input handlers for when the player is entering a word...
     if game.state == kGameStateEnteringWord then
         local change, acceleratedChange = playdate.getCrankChange()
 
-        -- Handle changing letters by cranking if the user has moved the crank.
+        -- Handle changing letters by cranking if the player has moved the crank.
         if acceleratedChange ~= 0 then
             game:handleCranking(acceleratedChange)
 
@@ -216,7 +221,7 @@ local function handleInput()
                 game:movePosition(1)
                 selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
             else
-                -- If we go right off the edge, move into submit mode.
+                -- If we go off the right edge, move into "submit" mode.
                 game:transitionTo(kGameStateSubmittingWord)
             end
         end
@@ -225,7 +230,7 @@ local function handleInput()
     end
 
     -- In submit mode we are focussed on the submit button. We can only move back out of submit
-    -- mode, or confirm our submission.
+    -- mode (left/B), or confirm our submission (right/A).
     if game.state == kGameStateSubmittingWord then
         if
             playdate.buttonJustPressed(playdate.kButtonLeft)
@@ -242,16 +247,17 @@ local function handleInput()
     end
 end
 
+-- Create the initial game.
 resetGame()
 
+-- If the player starts the game with the crank docked, show the "Use the crank!" popup for 2.5s
 local showingCrankAlert = false
 local crankAlertTimerExpired = false
 
--- If the player starts the game with the crank docked, show the "Use the crank!" popup for 2.5s
 if playdate.isCrankDocked() then
     playdate.ui.crankIndicator:start()
     showingCrankAlert = true
-    playdate.timer.performAfterDelay(2500, function() crankAlertTimerExpired = true end)
+    playdate.timer.performAfterDelay(2500, function () crankAlertTimerExpired = true end)
 end
 
 function playdate.update()

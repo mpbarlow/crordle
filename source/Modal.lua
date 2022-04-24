@@ -1,3 +1,6 @@
+-- Modal.lua
+-- This class handles the rendering of full-screen messages to the player.
+
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/object"
@@ -6,6 +9,7 @@ import "support"
 local gfx <const> = playdate.graphics
 local bounds <const> = playdate.geometry.rect.new(35, 70, 330, 100)
 
+-- These constants are used to lay out the modal contents.
 local smallFontHeight <const> = fonts.small:getHeight()
 local regularFontHeight <const> = fonts.regular:getHeight()
 local buttonIconWidth <const> = fonts.small:getTextWidth("Ⓐ")
@@ -20,9 +24,14 @@ function Modal:init()
 
     -- Message to display in the modal. If this is nil, the modal does not draw.
     local message = nil
+
+    -- The number lines of text in message
     local lines = 1
+
+    -- The text to render in the prompt to dismiss the modal
     local buttonText = nil
 
+    -- Pops a modal with the provided content
     local function displayMessage(self, newMessage, newButtonText)
         message = newMessage
         buttonText = newButtonText
@@ -50,7 +59,7 @@ function Modal:init()
         end
 
         doInGraphicsContext(function ()
-            -- 3D effect
+            -- 3D/shadow effect
             gfx.setColor(gfx.kColorBlack)
             gfx.fillRoundRect(0, 2, self.width, self.height - 2, 10)
 
@@ -92,6 +101,8 @@ function Modal:init()
     end
 
     sprite:setBounds(bounds)
+
+    -- Ensure the modal renders above everything else
     sprite:setZIndex(10)
     sprite:add()
 

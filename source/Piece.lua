@@ -1,3 +1,10 @@
+-- Piece.lua
+-- Piece encapsulates a single letter selection.
+-- Rendering is modelled as an endlessly scrolling, wrapping list. The previous, current, and next
+-- letters are rendered size.height pixels apart, with the entire thing shifted by offset % height.
+-- The current letter seamlessly becomes the last letter (and the next the current) as scrolling
+-- occurs, by mapping the offset over the 26 letters.
+
 import "CoreLibs/object"
 import "CoreLibs/graphics"
 import "CoreLibs/animator"
@@ -36,26 +43,18 @@ local snapDuration <const> = 250
 -- Timeout in ms after cranking stops before a letter snaps into place.
 local snapTimeout <const> = 1000
 
--- Piece encapsulates a single letter selection.
--- Rendering is modelled as an endlessly scrolling, wrapping list. The previous, current, and next
--- letters are rendered size.height pixels apart, with the entire thing shifted by offset % height.
--- The current letter seamlessly becomes the last letter (and the next the current) as scrolling
--- occurs, by mapping the offset over the 26 letters.
 class('Piece', {
-    -- Squares that are not yet in play do not render a letter.
+    -- Pieces that are not yet in play do not render a letter.
     inPlay = false
 }).extends()
 
 function Piece:init(origin, size)
     Piece.super.init(self)
 
-    -- Alias self to allow the sprite draw callback to read data from this.
-    local piece = self
-
     -- Track the current play state of our piece. Each piece starts unchecked.
     local pieceState = nil
 
-    -- Store the letter index. This is the source of truth for what letter is actually selected in
+    -- Store the letter index. This is the source of truth for which letter is actually selected in
     -- the piece.
     local index = 1
     local maxIndex <const> = #letters
@@ -68,7 +67,8 @@ function Piece:init(origin, size)
 
     local sprite = gfx.sprite.new()
 
-    -- Handles animating to a new position when using the buttons.
+    -- Handles animating to a new position when using the buttons or drawing the "flip" when the
+    -- player enters a word.
     local offsetAnimator = nil
     local flipAnimator = nil
 
@@ -198,12 +198,14 @@ function Piece:init(origin, size)
         return letters[index]
     end
 
-    -- Set the initial letter.
+    -- Set the a particular letter directly (used for setting the initial letter).
     local function setLetter(self, letter)
         index = table.indexOfElement(letters, string.upper(letter))
         offset = (index - 1) * size.height
     end
 
+    -- When checking an entry each piece is assigned a state based on whether the guess was correct.
+    -- We use that to determine how to draw the piece, and animate the transition.
     local function setPieceState(self, newState)
         pieceState = newState
         flipAnimator = gfx.animator.new(flipDuration, -1, 1)
@@ -236,7 +238,7 @@ function Piece:init(origin, size)
         end
 
         -- If we have a flip animator, we just need to tell the sprite to update, because it will
-        -- ready directly from the animator itself as there is no separate state to update.
+        -- read directly from the animator itself as there is no separate state to update.
         if flipAnimator ~= nil then
             sprite:markDirty()
 
@@ -246,9 +248,13 @@ function Piece:init(origin, size)
         end
     end
 
+    -- Remove the sprite in preparation for a new game.
     local function tearDown()
         sprite:remove()
     end
+
+    -- Alias self to allow the sprite draw callback to check if the piece is in play.
+    local piece = self
 
     -- Drawing callback.
     function sprite:draw(x, y, width, height)
@@ -325,7 +331,8 @@ function Piece:init(origin, size)
             local currentWidth = gfx.getTextSize(currentLetter)
             local nextWidth = gfx.getTextSize(nextLetter)
 
-            -- getTextSize reports back a height of 20px which doesn't seem to be right...
+            -- getTextSize reports back a height of 20px which I guess is line height rather than
+            -- the actual character? 16px seems to work well here.
             local letterHeight = 16
 
             -- The relative scroll offset within the height of the piece.

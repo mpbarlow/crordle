@@ -1,3 +1,6 @@
+-- SubmitButton.lua
+-- A small class to handle drawing the button the player presses to submit their word.
+
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/object"
@@ -26,7 +29,7 @@ function SubmitButton:init()
 
             -- Otherwise, draw black text on an outline button
             else
-                -- 3D effect
+                -- 3D/shadow effect
                 gfx.setColor(gfx.kColorBlack)
                 gfx.fillRoundRect(0, 2, self.width, self.height - 2, 15)
 

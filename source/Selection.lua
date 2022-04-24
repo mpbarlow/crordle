@@ -1,3 +1,6 @@
+-- Selection.lua
+-- Small class to handle highlighting the actively selected piece.
+
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/object"
@@ -5,7 +8,10 @@ import "support"
 
 local gfx <const> = playdate.graphics
 
+-- How much larger than the piece to draw the selection in px.
 local extraRadius <const> = 2
+
+-- The thickness of the surrounding line in px.
 local lineWidth <const> = 3
 
 class('Selection').extends()
@@ -39,6 +45,7 @@ function Selection:init(origin, squareSize, squareMargin)
         sprite:markDirty()
     end
 
+    -- When the player highlights the submit button, we don't want to be highlighting a piece too.
     local function hide(self)
         isHidden = true
         sprite:markDirty()

@@ -1,3 +1,8 @@
+-- Game.lua
+-- A class encapsulating the logic of the game itself. Instantiates the board and updates pieces
+-- as needed. Works like a state machine; the game is always in exactly one state and can transition
+-- to another in response to player action.
+
 import "CoreLibs/object"
 import "support"
 import "checkEntry"
@@ -34,6 +39,7 @@ class('Game', {
 function Game:init(solutionList, wordList, userData)
     Game.super.init(self)
 
+    -- Set the word for the game at random.
     self.word = table.randomElement(solutionList)
 
     if playdate.isSimulator then
@@ -64,9 +70,10 @@ function Game:init(solutionList, wordList, userData)
         return currentPosition
     end
 
-    -- Update game and piece state based on the contents of wordCheckResults.
+    -- Update game and piece state based on the contents of wordCheckResults, the object returned
+    -- by checkEntry().
     local function handleEntryCheck(wordCheckResults)
-        -- If the word was not in the list, emit an event and move back to entry mode.
+        -- If the word was not in the list, emit the appropriate event and move back to entry mode.
         if wordCheckResults.state == kWordStateNotInList then
             eventHandlers[kEventEnteredWordNotInList](self)
             self:transitionTo(kGameStateEnteringWord)
@@ -137,14 +144,17 @@ function Game:init(solutionList, wordList, userData)
         end
     end
 
+    -- Forward crank input to the active piece.
     local function handleCranking(self, acceleratedChange)
         board[currentRow][currentPosition]:handleCranking(acceleratedChange)
     end
 
+    -- Tell the active piece to move the letter selection by `steps` letters.
     local function moveLetter(self, steps)
         board[currentRow][currentPosition]:moveLetter(steps)
     end
 
+    -- Move the active piece selection by `steps` pieces.
     local function movePosition(self, steps)
         currentPosition += steps
     end
@@ -167,6 +177,7 @@ function Game:init(solutionList, wordList, userData)
             board[row][position]:setLetter(board[row][position - 1]:getLetter())
         end
 
+        -- Mark newly selected pieces as "in play"
         board[row][position].inPlay = pieceShouldBeInPlay
         board[row][position]:update()
     end
@@ -180,6 +191,7 @@ function Game:init(solutionList, wordList, userData)
         end
     end
 
+    -- Destroy the old sprites in preparation for a new game.
     local function tearDown()
         for row = 1, guessCount do
             for position = 1, letterCount do
@@ -188,6 +200,7 @@ function Game:init(solutionList, wordList, userData)
         end
     end
 
+    -- Bind public methods
     self.registerEventHandler = registerEventHandler
     self.getCurrentRow = getCurrentRow
     self.getCurrentPosition = getCurrentPosition

@@ -1,3 +1,7 @@
+-- checkEntry.lua
+-- Provides the function that checks player word entries against the correct word and the acceptable
+-- word list.
+
 import "support"
 
 -- Mark letter positions as correct if the letter at that position matches the letter at that
@@ -11,7 +15,7 @@ local function markCorrectLetters(map, enteredWord, correctWord)
 end
 
 -- Mark letter positions as wrong location if the letter at that position is present in the letters
--- of the correct word in positions that have not yet been classified.
+-- of the correct word, in positions that have not yet been classified.
 local function markWrongLocationLetters(map, enteredWord, correctWord)
     -- Create an array of the letters in the target word. We do this so we can remove matched
     -- letters without affecting the indexing.
@@ -45,6 +49,8 @@ local function markIncorrectLetters(map, enteredWord, correctWord)
     end
 end
 
+-- Given the player's entered word, the target word, and the acceptable word list, return a table
+-- containing the overall match state, and the state of each individual letter.
 function checkEntry(enteredWord, correctWord, wordList)
     local results = {
         state = nil,
