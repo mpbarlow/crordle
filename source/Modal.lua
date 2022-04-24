@@ -40,7 +40,7 @@ function Modal:init()
             return
         end
 
-        inGraphicsContext(function ()
+        doInGraphicsContext(function ()
             -- 3D effect
             gfx.setColor(gfx.kColorBlack)
             gfx.fillRoundRect(0, 2, self.width, self.height - 2, 10)

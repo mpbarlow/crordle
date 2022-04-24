@@ -13,14 +13,24 @@ end
 -- Mark letter positions as wrong location if the letter at that position is present in the letters
 -- of the correct word in positions that have not yet been classified.
 local function markWrongLocationLetters(map, enteredWord, correctWord)
-    for i = 1, #enteredWord do
-        if map[i] == nil then
-            local remainingLetters <const> = correctWord:filter(function (_, index)
-                return map[index] == nil
-            end)
+    -- Create an array of the letters in the target word. We do this so we can remove matched
+    -- letters without affecting the indexing.
+    local correctWordLetters <const> = {}
 
-            if remainingLetters:find(enteredWord:sub(i, i)) ~= nil then
+    for i = 1, #correctWord do
+        correctWordLetters[i] = correctWord:sub(i, i)
+    end
+
+    -- Iterate through the player's entry...
+    for i = 1, #enteredWord do
+        -- If the letter has already been classified (i.e. it's correct), do not consider it.
+        if map[i] == nil then
+            -- Check to see if the letter is present in the correct word
+            if table.indexOfElement(correctWordLetters, enteredWord:sub(i, i)) ~= nil then
+                -- If it is, mark the entered letter as wrong location and remove the letter from
+                -- the correct word map, so it can't be double-matched.
                 map[i] = kLetterStateWrongLocation
+                correctWordLetters[i] = nil
             end
         end
     end

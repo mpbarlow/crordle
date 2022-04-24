@@ -49,7 +49,7 @@ function Selection:init(origin, squareSize, squareMargin)
             return
         end
 
-        inGraphicsContext(function ()
+        doInGraphicsContext(function ()
             gfx.setColor(gfx.kColorBlack)
             gfx.setLineWidth(lineWidth)
             gfx.drawRect(0, 0, self.width, self.height)

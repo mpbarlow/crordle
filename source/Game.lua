@@ -27,11 +27,6 @@ local function createBoard()
 end
 
 class('Game', {
-    -- Set default event listeners so we don't have to check if they're defined before firing them.
-    listeners = {
-        [kEventGameStateDidTransition] = function () end,
-        [kEventEnteredWordNotInList] = function () end,
-    },
     -- We begin the game entering a word.
     state = kGameStateEnteringWord
 }).extends()
@@ -39,8 +34,18 @@ class('Game', {
 function Game:init(wordList)
     Game.super.init(self)
 
-    -- TODO: Why doesn't this work as an instance method?
     self.word = table.randomElement(wordList)
+
+    -- Set default event handlers so we don't have to check if they're defined before firing them.
+    local eventHandlers = {
+        [kEventGameStateDidTransition] = function () end,
+        [kEventEnteredWordNotInList] = function () end,
+    }
+
+    -- Register a handler for a particular game event.
+    local function registerEventHandler(self, event, handler)
+        eventHandlers[event] = handler
+    end
 
     local board <const> = createBoard()
 
@@ -59,7 +64,7 @@ function Game:init(wordList)
     local function handleEntryCheck(wordCheckResults)
         -- If the word was not in the list, emit an event and move back to entry mode.
         if wordCheckResults.state == kWordStateNotInList then
-            self.listeners[kEventEnteredWordNotInList](self)
+            eventHandlers[kEventEnteredWordNotInList](self)
             self:transitionTo(kGameStateEnteringWord)
 
         -- Otherwise, update each piece's state to match the results. We update each piece a
@@ -119,7 +124,7 @@ function Game:init(wordList)
         -- Update our state and call the event listener for a state transition to allow stuff
         -- outside of the core game logic to react (e.g. displaying a modal).
         self.state = newState
-        self.listeners[kEventGameStateDidTransition](self, newState)
+        eventHandlers[kEventGameStateDidTransition](self, newState)
 
         -- If we've moved into the entry check state, check the input and update the game and piece
         -- state accordingly.
@@ -142,7 +147,9 @@ function Game:init(wordList)
 
     -- Update the board piece at the given (row, position) co-ordinate.
     local function updatePieceAt(row, position)
-        local pieceShouldBeInPlay = row < currentRow or position <= currentPosition
+        local pieceShouldBeInPlay = board[row][position].inPlay
+            or row < currentRow
+            or position <= currentPosition
 
         -- When first adding a piece to play, set its initial letter to the last selected letter,
         -- rather than making the player go from "A" every time.
@@ -172,6 +179,7 @@ function Game:init(wordList)
         end
     end
 
+    self.registerEventHandler = registerEventHandler
     self.getCurrentRow = getCurrentRow
     self.getCurrentPosition = getCurrentPosition
     self.transitionTo = transitionTo

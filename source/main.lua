@@ -1,6 +1,7 @@
 import "CoreLibs/graphics"
 import "CoreLibs/sprites"
 import "CoreLibs/timer"
+import "CoreLibs/ui"
 
 import "support"
 import "Game"
@@ -11,6 +12,7 @@ import "Modal"
 math.randomseed(playdate.getSecondsSinceEpoch())
 
 local gfx <const> = playdate.graphics
+local logo <const> = playdate.graphics.image.new("images/Crordle logo")
 
 -- An 8x8 pattern that has a white background with a single block dot (approximately) in the center
 local dotPattern <const> = {0xFF, 0xFF, 0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF}
@@ -21,28 +23,45 @@ local wordList <const> = import "words"
 local uiState = kUIStatePlayingGame
 
 -- Objects for UI elements in-game
-local selection = Selection(boardOrigin, pieceSize, pieceMargin)
-local submitButton = SubmitButton()
-local modal = Modal()
+local selection <const> = Selection(boardOrigin, pieceSize, pieceMargin)
+local submitButton <const> = SubmitButton()
+local modal <const> = Modal()
 
 -- Tracks the state for the current game.
-local game = Game(wordList)
+local game
 
--- Perform the initial set up to configure the intial piece selection and background.
-selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
-
+-- Draw our background pattern and the Crordle logo
 gfx.sprite.setBackgroundDrawingCallback(function(x, y, width, height)
     gfx.setClipRect(x, y, width, height)
-    gfx.setPattern(dotPattern)
-    gfx.fillRect(x, y, width, height)
+
+    doInGraphicsContext(function ()
+        -- Background pattern
+        gfx.setPattern(dotPattern)
+        gfx.fillRect(x, y, width, height)
+
+        -- Logo
+        logo:draw(210, 25)
+
+        -- Controls
+        gfx.setColor(gfx.kColorWhite)
+        gfx.fillRoundRect(200, 155, 180, 65, 5)
+
+        gfx.setColor(gfx.kColorBlack)
+        gfx.drawRoundRect(200, 155, 180, 65, 5)
+
+        fonts.small:drawTextAligned("Crank/Up/Down: Choose", 290, 160, kTextAlignment.center)
+        fonts.small:drawTextAligned("Ⓐ/Right: Next", 290, 180, kTextAlignment.center)
+        fonts.small:drawTextAligned("Ⓑ/Left: Previous", 290, 200, kTextAlignment.center)
+    end)
+
     gfx.clearClipRect()
 end)
 
 -- To avoid having to implement a system where we check the game state each update and ensure we
 -- only react to each change once, we instead have a nice event system where the game will call
 -- our functions in response to various state changes.
-local function registerEvents()
-    game.listeners[kEventGameStateDidTransition] = function(game, newState)
+local function registerEventHandlers()
+    game:registerEventHandler(kEventGameStateDidTransition, function(game, newState)
         -- If we move into submission mode, we want to hide the selection ring and highlight the
         -- submit button.
         if newState == kGameStateSubmittingWord then
@@ -62,23 +81,26 @@ local function registerEvents()
             uiState = kUIStateDisplayingModal
             modal:displayMessage("Bad luck! The word was \"" .. game.word .. "\".", "Try again")
         end
-    end
+    end)
 
     -- If the word was not in the list, display a modal informing the player.
-    game.listeners[kEventEnteredWordNotInList] = function()
+    game:registerEventHandler(kEventEnteredWordNotInList, function()
         uiState = kUIStateDisplayingModal
-        modal:displayMessage("I don't know that word.")
-    end
+        modal:displayMessage("That's not in the word list!")
+    end)
 end
 
 -- Start a new game
 local function resetGame()
     -- Before we kill the old game we need to remove all the piece sprites from the display list
     -- so they don't keep drawing underneath our new sprites.
-    game:tearDown()
+    if game ~= nil then
+        game:tearDown()
+    end
 
-    -- Cast the old game unto ye cruel garbage collector
+    -- Create a new game, casting any old game unto ye cruel garbage collector
     game = Game(wordList)
+    registerEventHandlers()
 
     -- Reset UI
     selection:moveTo(game:getCurrentRow(), game:getCurrentPosition())
@@ -165,7 +187,17 @@ local function handleInput()
     end
 end
 
-registerEvents()
+resetGame()
+
+local showingCrankAlert = false
+local crankAlertTimerExpired = false
+
+-- If the player starts the game with the crank docked, show the "Use the crank!" popup for 2.5s
+if playdate.isCrankDocked() then
+    playdate.ui.crankIndicator:start()
+    showingCrankAlert = true
+    playdate.timer.performAfterDelay(2500, function() crankAlertTimerExpired = true end)
+end
 
 function playdate.update()
     -- Check to see if we're crankin' or pressing any buttons, and handle accordingly.
@@ -175,5 +207,10 @@ function playdate.update()
     game:updatePieces()
 
     gfx.sprite.update()
+
+    if showingCrankAlert and not crankAlertTimerExpired then
+        playdate.ui.crankIndicator:update()
+    end
+
     playdate.timer.updateTimers()
 end

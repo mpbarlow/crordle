@@ -4,7 +4,7 @@ import "CoreLibs/object"
 import "support"
 
 local gfx <const> = playdate.graphics
-local bounds <const> = playdate.geometry.rect.new(215, 100, 150, 40)
+local bounds <const> = playdate.geometry.rect.new(215, 95, 150, 40)
 
 class('SubmitButton').extends()
 
@@ -16,7 +16,7 @@ function SubmitButton:init()
 
     -- Configure how the submit button draws itself.
     function sprite:draw(x, y, width, height)
-        inGraphicsContext(function ()
+        doInGraphicsContext(function ()
             -- If highlighted, fill the button and draw white text.
             if isHighlighted then
                 gfx.setColor(gfx.kColorBlack)

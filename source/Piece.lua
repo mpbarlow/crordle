@@ -252,7 +252,7 @@ function Piece:init(origin, size)
 
     -- Drawing callback.
     function sprite:draw(x, y, width, height)
-        inGraphicsContext(function ()
+        doInGraphicsContext(function ()
             local yOffset = 0
             local height = self.height
             local flipProgress = 0

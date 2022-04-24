@@ -1,5 +1,4 @@
 -- support.lua
---
 -- Provides game enum constants, global "knobs and dials", and helper functions.
 
 import "CoreLibs/graphics"
@@ -47,7 +46,7 @@ fonts = {
 
 -- Run the provided callback inside its own graphics context. Useful if the callback has multiple
 -- return points and you don't want to have to track popping the context in all of them.
-function inGraphicsContext(callback)
+function doInGraphicsContext(callback)
     gfx.pushContext()
     callback()
     gfx.popContext()
@@ -56,27 +55,4 @@ end
 -- Additional table functions
 function table.randomElement(t)
     return t[math.random(1, #t)]
-end
-
--- Additional string functions
-function string.reduce(s, callback, carry)
-    for i = 1, #s do
-        carry = callback(carry, s:sub(i, i), i)
-    end
-
-    return carry
-end
-
-function string.map(s, callback)
-    return s:reduce(function (carry, value, index) return carry .. callback(value, index) end, "")
-end
-
-function string.filter(s, callback)
-    return s:reduce(function (carry, value, index)
-        if callback(value, index) then
-            carry = carry .. value
-        end
-
-        return carry
-    end, "")
 end
