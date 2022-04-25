@@ -21,20 +21,35 @@ local function markWrongLocationLetters(map, enteredWord, correctWord)
     -- letters without affecting the indexing.
     local correctWordLetters <const> = {}
 
+    -- If a letter has already been correctly matched, we won't want to consider it in either the
+    -- entered or correct word.
     for i = 1, #correctWord do
-        correctWordLetters[i] = correctWord:sub(i, i)
+        if map[i] == nil then
+            correctWordLetters[i] = correctWord:sub(i, i)
+        else
+            correctWordLetters[i] = nil
+        end
     end
 
     -- Iterate through the player's entry...
     for i = 1, #enteredWord do
         -- If the letter has already been classified (i.e. it's correct), do not consider it.
         if map[i] == nil then
-            -- Check to see if the letter is present in the correct word
-            if table.indexOfElement(correctWordLetters, enteredWord:sub(i, i)) ~= nil then
-                -- If it is, mark the entered letter as wrong location and remove the letter from
-                -- the correct word map, so it can't be double-matched.
+            local actualIndex = nil
+
+            for j = 1, #correctWord do
+                -- Check to see if the letter is present in the correct word. table.indexOfElement
+                -- doesn't seem to work right once you've unset some keys.
+                if actualIndex == nil and correctWordLetters[j] == enteredWord:sub(i, i) then
+                    actualIndex = j
+                end
+            end
+
+            -- If it is, mark the entered letter as wrong location and remove the letter from the
+            -- correct word map, so it can't be double-matched.
+            if actualIndex ~= nil then
                 map[i] = kLetterStateWrongLocation
-                correctWordLetters[i] = nil
+                correctWordLetters[actualIndex] = nil
             end
         end
     end
