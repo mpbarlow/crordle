@@ -165,16 +165,40 @@ function Game:init(solutionList, wordList, userData)
             or row < currentRow
             or position <= currentPosition
 
-        -- When first adding a piece to play, set its initial letter to the last selected letter,
-        -- rather than making the player go from "A" every time -- unless they would prefer to and
-        -- have changed the setting.
-        if
-            not userData.startFromA
-            and position > 1
-            and not board[row][position].inPlay
-            and pieceShouldBeInPlay
-        then
-            board[row][position]:setLetter(board[row][position - 1]:getLetter())
+        -- When first adding a piece to play, set its initial letter based on the user's preference.
+        if pieceShouldBeInPlay and not board[row][position].inPlay then
+            -- Track whether we autofilled, because if we can't, we need to fall back to whatever
+            -- the user's startFromA preference is.
+            local pieceWasAutofilled = false
+
+            -- If the user wants to autofill previous correct letters, check if the piece at the
+            -- current position was correct in any previous row.
+            if userData.autofill and row > 1 then
+                local checkingRow = row - 1
+
+                -- Loop backwards through previous rows:
+                while not pieceWasAutofilled and checkingRow > 0 do
+                    if board[checkingRow][position]:isCorrect() then
+                        -- If a previous guess at this position was correct, set our letter
+                        -- accordingly and stop looping
+                        board[row][position]:setLetter(board[checkingRow][position]:getLetter())
+                        pieceWasAutofilled = true
+                    else
+                        -- Otherwise move onto the previous row.
+                        checkingRow -= 1
+                    end
+                end
+            end
+
+            -- If the user does not want to start from A every time, start from the last letter they
+            -- selected in this row.
+            if
+                not pieceWasAutofilled
+                and position > 1
+                and not userData.startFromA
+            then
+                board[row][position]:setLetter(board[row][position - 1]:getLetter())
+            end
         end
 
         -- Mark newly selected pieces as "in play"

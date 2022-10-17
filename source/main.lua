@@ -28,11 +28,31 @@ local wordList <const> = import "words"
 -- dismissing a modal.
 local uiState = kUIStatePlayingGame
 
--- Retrieve the stored game stats (or create them if they don't exist yet).
-local userData <const> = playdate.datastore.read() or {
+-- Retrieve the stored game stats
+local userData = playdate.datastore.read() or {}
+
+-- Set defaults for any new options the player's datastore doesn't currently have.
+local defaultUserData <const> = {
+    autofill = true,
     startFromA = false,
     gameStats = {played = 0, won = 0, streak = 0}
 }
+
+for key, default in pairs(defaultUserData) do
+    if userData[key] == nil then
+        userData[key] = default
+    end
+end
+
+-- Add an option to the menu allowing the player to auto-fill correct guesses.
+playdate.getSystemMenu():addCheckmarkMenuItem(
+    "autofill",
+    userData.autofill,
+    function (newValue)
+        userData.autofill = newValue
+        playdate.datastore.write(userData)
+    end
+)
 
 -- Add an option to the menu allowing the player to have every piece start at "A", rather than the
 -- previous letter.
@@ -191,12 +211,8 @@ local function handleInput()
     if game.state == kGameStateEnteringWord then
         local change, acceleratedChange = playdate.getCrankChange()
 
-        -- Handle changing letters by cranking if the player has moved the crank.
-        if acceleratedChange ~= 0 then
-            game:handleCranking(acceleratedChange)
-
         -- Handle changing letters by pressing up or down
-        elseif playdate.buttonJustPressed(playdate.kButtonUp) then
+        if playdate.buttonJustPressed(playdate.kButtonUp) then
             game:moveLetter(-1)
 
         elseif playdate.buttonJustPressed(playdate.kButtonDown) then
@@ -224,6 +240,13 @@ local function handleInput()
                 -- If we go off the right edge, move into "submit" mode.
                 game:transitionTo(kGameStateSubmittingWord)
             end
+
+        -- Handle changing letters by cranking if the player has moved the crank.
+        -- We want to check this last as crank acceleration has a slight roll-off that can block
+        -- button input, which doesn't feel right.
+        elseif acceleratedChange ~= 0 then
+            game:handleCranking(acceleratedChange)
+
         end
 
         return

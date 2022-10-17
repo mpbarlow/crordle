@@ -1,8 +1,8 @@
 name=Crordle
 author=Matt Barlow
 bundleID=coffee.barlow.crordle
-version=1.0
+version=1.1
 buildNumber=202204250119
 imagePath=images/system
-pdxversion=11000
-buildtime=704161188
+pdxversion=11200
+buildtime=719346911

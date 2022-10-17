@@ -211,6 +211,11 @@ function Piece:init(origin, size)
         flipAnimator = gfx.animator.new(flipDuration, -1, 1)
     end
 
+    -- Check if the letter is correct. This allows autofilling correct guesses on subsequent rows.
+    local function isCorrect(self)
+        return pieceState == kLetterStateCorrect
+    end
+
     -- Do anything that needs to run on every frame.
     local function update(self)
         -- If we've configured an animator, get the next value and update our current offset to it.
@@ -368,6 +373,7 @@ function Piece:init(origin, size)
     self.getLetter = getLetter
     self.setLetter = setLetter
     self.setPieceState = setPieceState
+    self.isCorrect = isCorrect
     self.update = update
     self.tearDown = tearDown
 end
